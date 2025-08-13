@@ -23,6 +23,18 @@ const getCategoryEmoji = (category: string) => {
   }
 };
 
+// Helper function for consistent date formatting (SSR-safe)
+const formatDate = (dateString: string | Date) => {
+  const date = new Date(dateString);
+  
+  // Use explicit formatting to avoid locale differences
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const year = date.getFullYear();
+  
+  return `${month}/${day}/${year}`;
+};
+
 const RecordItem = ({ record }: { record: Record }) => {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -80,10 +92,10 @@ const RecordItem = ({ record }: { record: Record }) => {
         <div className='space-y-2 sm:space-y-3'>
           <div className='flex items-center justify-between'>
             <span className='text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide uppercase'>
-              {new Date(record?.date).toLocaleDateString()}
+              {formatDate(record?.date)}
             </span>
             <span className='text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100'>
-              ${record?.amount.toFixed(2)}
+              ₹{record?.amount.toFixed(2)}
             </span>
           </div>
 

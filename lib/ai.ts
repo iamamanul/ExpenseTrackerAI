@@ -64,6 +64,8 @@ export async function generateExpenseInsights(
     2. Budget alerts (high spending areas)
     3. Money-saving opportunities
     4. Positive reinforcement for good habits
+    Use Indian Rupees (₹) instead of US Dollars for all amounts.
+    If any amount is calculated, assume 1 USD = 83 INR and show it in ₹ format (e.g., ₹1,500).
 
     Return only valid JSON array, no additional text.`;
 
