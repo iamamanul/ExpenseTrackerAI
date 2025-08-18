@@ -271,7 +271,7 @@ const AIInsights = () => {
       setInsights(newInsights);
       setLastUpdated(new Date());
       setLastUsedAPI(preferredAPI);
-      setCurrentModel('Server Action');
+      setCurrentModel('');
 
       // Update model status - server succeeded
       setModelStatus(prev => ({
@@ -689,10 +689,8 @@ Keep the advice actionable and specific to Indian financial practices.`;
       <div className='mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-gray-100 dark:border-gray-700'>
         <div className='flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0'>
           <div className='flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400'>
-            <div className='w-5 h-5 sm:w-6 sm:h-6 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center'>
-              <span className='text-sm'>💡</span>
-            </div>
-            <span className='font-medium text-xs'>AI-Powered Financial Insights</span>
+            
+           
             
             {/* Model Status Indicators */}
             <div className='flex items-center gap-2 ml-2'>

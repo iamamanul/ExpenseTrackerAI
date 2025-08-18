@@ -628,16 +628,7 @@ const RecordHistoryClient = ({ initialRecords, initialError }: RecordHistoryClie
             </div>
           </div>
 
-          <div className="mb-6 sm:mb-8 space-y-4 sm:space-y-6">
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-              <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                Layout: {isMobile ? '8 cards per page' : '3 rows per page'}
-              </span>
-              <div className="px-2 sm:px-3 py-1 sm:py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg text-xs font-medium border border-emerald-200 dark:border-emerald-700">
-                {isMobile ? `${MOBILE_CARDS_PER_PAGE} cards max` : `${CARDS_PER_PAGE} cards max`}
-              </div>
-            </div>
-          </div>
+         
 
           <div className="mobile-content-area relative h-auto sm:h-[700px] flex flex-col">
             {filteredAndSortedRecords.length === 0 ? (
