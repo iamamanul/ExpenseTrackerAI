@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react'; // Fix 6: Imported useCallback
 import { getAIInsights } from '@/app/actions/getAIInsights';
 
 interface InsightData {
@@ -23,10 +23,11 @@ interface AIAnswer {
 type APIProvider = 'groq' | 'gemini';
 
 // Model information for display
-const MODEL_INFO = {
-  'groq': 'Groq Llama',
-  'gemini': 'Google Gemini'
-};
+// Fix 1: Removed unused MODEL_INFO constant
+// const MODEL_INFO = {
+//   'groq': 'Groq Llama',
+//   'gemini': 'Google Gemini'
+// };
 
 // Helper function to convert dollar symbols to rupee symbols
 const convertCurrencyInText = (text: string): string => {
@@ -37,11 +38,11 @@ const convertCurrencyInText = (text: string): string => {
 const checkAPIKeys = () => {
   const groqKey = process.env.NEXT_PUBLIC_GROQ_API_KEY;
   const geminiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-  
+
   console.log('🔍 API Key Check:');
   console.log('Groq Key Available:', !!groqKey, groqKey ? `Length: ${groqKey.length}` : 'Missing');
   console.log('Gemini Key Available:', !!geminiKey, geminiKey ? `Length: ${geminiKey.length}` : 'Missing');
-  
+
   return { groqKey: !!groqKey, geminiKey: !!geminiKey };
 };
 
@@ -53,7 +54,7 @@ const callGroqAPI = async (question: string): Promise<string> => {
   }
 
   console.log('🚀 Calling Groq API directly...');
-  
+
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -76,13 +77,13 @@ const callGroqAPI = async (question: string): Promise<string> => {
       max_tokens: 150,
     }),
   });
-  
+
   console.log('📡 Groq Response Status:', response.status);
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error('❌ Groq Error Response:', errorText);
-    
+
     if (response.status === 429) {
       throw new Error('Rate limit exceeded. Please try again in a few minutes.');
     } else if (response.status === 401) {
@@ -90,18 +91,18 @@ const callGroqAPI = async (question: string): Promise<string> => {
     } else if (response.status >= 500) {
       throw new Error('Groq service temporarily unavailable. Please try again.');
     }
-    
+
     throw new Error(`Groq API error: ${response.status} - ${errorText}`);
   }
-  
+
   const data = await response.json();
   console.log('📦 Groq Response:', data);
-  
+
   const answer = data.choices?.[0]?.message?.content;
   if (!answer) {
     throw new Error('No answer content received from Groq');
   }
-  
+
   console.log('✅ Groq Success');
   return answer.trim();
 };
@@ -113,7 +114,7 @@ const callGeminiAPI = async (question: string): Promise<string> => {
   }
 
   console.log('🚀 Calling Gemini API directly...');
-  
+
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: {
@@ -140,13 +141,13 @@ Requirements:
       },
     }),
   });
-  
+
   console.log('📡 Gemini Response Status:', response.status);
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error('❌ Gemini Error Response:', errorText);
-    
+
     if (response.status === 429) {
       throw new Error('Rate limit exceeded. Please try again in a few minutes.');
     } else if (response.status === 400) {
@@ -154,18 +155,18 @@ Requirements:
     } else if (response.status >= 500) {
       throw new Error('Gemini service temporarily unavailable. Please try again.');
     }
-    
+
     throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
   }
-  
+
   const data = await response.json();
   console.log('📦 Gemini Response:', data);
-  
+
   const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!answer) {
     throw new Error('No answer content received from Gemini');
   }
-  
+
   console.log('✅ Gemini Success');
   return answer.trim();
 };
@@ -173,61 +174,65 @@ Requirements:
 // FIXED: Generate AI answer with proper fallback logic
 const generateAIAnswer = async (question: string, preferredAPI: APIProvider): Promise<{ answer: string, usedAPI: APIProvider }> => {
   const timeoutMs = 15000; // 15 second timeout
-  
+
   const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
     return Promise.race([
       promise,
-      new Promise<T>((_, reject) => 
+      new Promise<T>((_, reject) =>
         setTimeout(() => reject(new Error('Request timeout - API took too long to respond')), ms)
       )
     ]);
   };
-  
+
   // Try preferred API first
+  let primaryError: Error;
   try {
     console.log(`🚀 Trying preferred API: ${preferredAPI}`);
-    
+
     let answer: string;
     if (preferredAPI === 'groq') {
       answer = await withTimeout(callGroqAPI(question), timeoutMs);
     } else {
       answer = await withTimeout(callGeminiAPI(question), timeoutMs);
     }
-    
+
     return { answer, usedAPI: preferredAPI };
-    
-  } catch (error: any) {
-    console.log(`❌ ${preferredAPI} failed:`, error.message);
-    
+
+  } catch (error: unknown) { // Fix 2: Replaced 'any' with 'unknown'
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    primaryError = new Error(errorMessage);
+    console.log(`❌ ${preferredAPI} failed:`, errorMessage);
+
     // Try fallback API
     const fallbackAPI: APIProvider = preferredAPI === 'groq' ? 'gemini' : 'groq';
-    
+
     try {
       console.log(`🔄 Falling back to: ${fallbackAPI}`);
-      
+
       let answer: string;
       if (fallbackAPI === 'groq') {
         answer = await withTimeout(callGroqAPI(question), timeoutMs);
       } else {
         answer = await withTimeout(callGeminiAPI(question), timeoutMs);
       }
-      
+
       return { answer, usedAPI: fallbackAPI };
-      
-    } catch (fallbackError: any) {
-      console.log(`❌ ${fallbackAPI} also failed:`, fallbackError.message);
-      
+
+    } catch (fallbackError: unknown) { // Fix 3: Replaced 'any' with 'unknown'
+      const fallbackErrorMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+      console.log(`❌ ${fallbackAPI} also failed:`, fallbackErrorMessage);
+
       // Both APIs failed - provide helpful error message
       const { groqKey, geminiKey } = checkAPIKeys();
-      
+
       if (!groqKey && !geminiKey) {
         throw new Error('No API keys configured. Please add NEXT_PUBLIC_GROQ_API_KEY or NEXT_PUBLIC_GEMINI_API_KEY to your environment variables.');
       } else if (!groqKey) {
-        throw new Error(`Gemini API failed: ${fallbackError.message}. Consider adding NEXT_PUBLIC_GROQ_API_KEY as a backup.`);
+        throw new Error(`Gemini API failed: ${fallbackErrorMessage}. Consider adding NEXT_PUBLIC_GROQ_API_KEY as a backup.`);
       } else if (!geminiKey) {
-        throw new Error(`Groq API failed: ${error.message}. Consider adding NEXT_PUBLIC_GEMINI_API_KEY as a backup.`);
+        throw new Error(`Groq API failed: ${primaryError.message}. Consider adding NEXT_PUBLIC_GEMINI_API_KEY as a backup.`);
       } else {
-        throw new Error(`Both APIs failed. Groq: ${error.message} | Gemini: ${fallbackError.message}`);
+        throw new Error(`Both APIs failed. Groq: ${primaryError.message} | Gemini: ${fallbackErrorMessage}`);
       }
     }
   }
@@ -256,7 +261,8 @@ const AIInsights = () => {
     checkAPIKeys();
   }, []);
 
-  const loadInsights = async () => {
+  // Fix 6: Wrapped loadInsights in useCallback
+  const loadInsights = useCallback(async () => {
     setIsLoading(true);
     setCurrentModel(null);
     try {
@@ -266,36 +272,37 @@ const AIInsights = () => {
       setLastUpdated(new Date());
       setLastUsedAPI(preferredAPI);
       setCurrentModel('Server Action');
-      
+
       // Update model status - server succeeded
       setModelStatus(prev => ({
         ...prev,
         [preferredAPI]: 'working'
       }));
-      
-    } catch (error: any) {
+
+    } catch (error: unknown) { // Fix 4: Replaced 'any' with 'unknown'
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('❌ Failed to load AI insights:', error);
-      
+
       // Update model status to show failure
       setModelStatus({
         'groq': 'failed',
         'gemini': 'failed'
       });
-      
+
       // Fallback to mock data
       setInsights([
         {
           id: 'fallback-1',
           type: 'info',
           title: 'AI Insights Unavailable',
-          message: `Unable to generate AI insights: ${error.message}. Please check your API configuration.`,
+          message: `Unable to generate AI insights: ${errorMessage}. Please check your API configuration.`,
           action: 'Retry or check settings',
         },
       ]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [preferredAPI]); // Dependency for useCallback
 
   // FIXED: Handle action click with working AI calls
   const handleActionClick = async (insight: InsightData) => {
@@ -337,60 +344,61 @@ Please provide specific, practical steps to address this financial situation. In
 Keep the advice actionable and specific to Indian financial practices.`;
 
       console.log('❓ Generated question for AI');
-      
+
       // Call AI API directly
       const { answer, usedAPI } = await generateAIAnswer(question, preferredAPI);
-      
+
       console.log('💾 Saving successful answer to state...');
-      
+
       // Update answer in state
       setAiAnswers((prev) =>
         prev.map((a) =>
-          a.insightId === insight.id ? { 
-            ...a, 
-            answer: convertCurrencyInText(answer), 
-            isLoading: false 
+          a.insightId === insight.id ? {
+            ...a,
+            answer: convertCurrencyInText(answer),
+            isLoading: false
           } : a
         )
       );
-      
+
       // Update model status
       setModelStatus(prev => ({
         ...prev,
         [usedAPI]: 'working'
       }));
-      
+
       setLastUsedAPI(usedAPI);
-      
+
       console.log('✅ Answer generation completed successfully');
-      
-    } catch (error: any) {
+
+    } catch (error: unknown) { // Fix 5: Replaced 'any' with 'unknown'
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('💥 Answer generation failed:', error);
-      
+
       // Provide helpful error message based on error type
-      let errorMessage = 'Unable to generate AI answer.';
+      let displayErrorMessage = 'Unable to generate AI answer.';
       let debugInfo = '';
-      
-      if (error.message?.includes('API key')) {
-        errorMessage = '🔑 API Configuration Issue';
+
+      if (errorMessage?.includes('API key')) {
+        displayErrorMessage = '🔑 API Configuration Issue';
         debugInfo = 'Please set up your API keys in environment variables (NEXT_PUBLIC_GROQ_API_KEY or NEXT_PUBLIC_GEMINI_API_KEY).';
-      } else if (error.message?.includes('Rate limit') || error.message?.includes('429')) {
-        errorMessage = '⏱️ Rate Limit Reached';
+      } else if (errorMessage?.includes('Rate limit') || errorMessage?.includes('429')) {
+        displayErrorMessage = '⏱️ Rate Limit Reached';
         debugInfo = 'API rate limit exceeded. Please wait a few minutes before trying again.';
-      } else if (error.message?.includes('timeout')) {
-        errorMessage = '🌐 Request Timeout';
+      } else if (errorMessage?.includes('timeout')) {
+        displayErrorMessage = '🌐 Request Timeout';
         debugInfo = 'The API request took too long. Please check your internet connection and try again.';
-      } else if (error.message?.includes('500') || error.message?.includes('503')) {
-        errorMessage = '🔧 Service Temporarily Unavailable';
+      } else if (errorMessage?.includes('500') || errorMessage?.includes('503')) {
+        displayErrorMessage = '🔧 Service Temporarily Unavailable';
         debugInfo = 'The AI service is experiencing temporary issues. Please try again in a few minutes.';
       } else {
-        errorMessage = '❌ Unexpected Error';
-        debugInfo = error.message || 'An unknown error occurred while generating the answer.';
+        displayErrorMessage = '❌ Unexpected Error';
+        debugInfo = errorMessage || 'An unknown error occurred while generating the answer.';
       }
-      
+
       // For the specific insight, provide manual advice
       let manualAdvice = 'Consider consulting with a financial advisor for personalized guidance.';
-      
+
       if (insight.title.toLowerCase().includes('food') || insight.title.toLowerCase().includes('dining')) {
         manualAdvice = 'Try meal planning, cooking at home more often, and setting a monthly dining budget. Track your food expenses for a week to identify spending patterns.';
       } else if (insight.title.toLowerCase().includes('transportation')) {
@@ -398,19 +406,19 @@ Keep the advice actionable and specific to Indian financial practices.`;
       } else if (insight.title.toLowerCase().includes('health')) {
         manualAdvice = 'Build an emergency health fund, compare insurance options, and consider preventive care to avoid larger medical expenses later.';
       }
-      
+
       setAiAnswers((prev) =>
         prev.map((a) =>
           a.insightId === insight.id
             ? {
-                ...a,
-                answer: `${errorMessage}\n\n${debugInfo}\n\nGeneral Advice for "${insight.title}": ${manualAdvice}`,
-                isLoading: false,
-              }
+              ...a,
+              answer: `${displayErrorMessage}\n\n${debugInfo}\n\nGeneral Advice for "${insight.title}": ${manualAdvice}`,
+              isLoading: false,
+            }
             : a
         )
       );
-      
+
       // Update model status to show failure
       setModelStatus(prev => ({
         ...prev,
@@ -427,7 +435,7 @@ Keep the advice actionable and specific to Indian financial practices.`;
 
   useEffect(() => {
     loadInsights();
-  }, []);
+  }, [loadInsights]); // Fix 6: Added loadInsights to dependency array
 
   const getInsightIcon = (type: string) => {
     switch (type) {
@@ -591,11 +599,11 @@ Keep the advice actionable and specific to Indian financial practices.`;
                 <div className='flex-1'>
                   <div className='flex items-center gap-2 sm:gap-3 mb-2'>
                     <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center ${
-                        insight.type === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/50' :
-                        insight.type === 'success' ? 'bg-green-100 dark:bg-green-900/50' :
-                        insight.type === 'tip' ? 'bg-emerald-100 dark:bg-emerald-900/50' :
-                        'bg-emerald-100 dark:bg-emerald-900/50'
-                      }`}>
+                      insight.type === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/50' :
+                      insight.type === 'success' ? 'bg-green-100 dark:bg-green-900/50' :
+                      insight.type === 'tip' ? 'bg-emerald-100 dark:bg-emerald-900/50' :
+                      'bg-emerald-100 dark:bg-emerald-900/50'
+                    }`}>
                       <span className='text-sm sm:text-lg'>{getInsightIcon(insight.type)}</span>
                     </div>
                     <div className='flex-1'>
