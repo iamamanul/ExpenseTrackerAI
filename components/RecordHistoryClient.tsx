@@ -26,7 +26,8 @@ const SORT_OPTIONS = [
   { value: 'lowest', label: 'Lowest Amount', icon: '💸' }
 ];
 
-const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 'all'];
+// Fix 1: Removed unused ITEMS_PER_PAGE_OPTIONS constant
+// const ITEMS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 'all'];
 
 const RecordHistoryClient = ({ initialRecords, initialError }: RecordHistoryClientProps) => {
   const [records, setRecords] = useState<Record[]>(initialRecords);
@@ -34,7 +35,7 @@ const RecordHistoryClient = ({ initialRecords, initialError }: RecordHistoryClie
   const [dateFilter, setDateFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [searchQuery, setSearchQuery] = useState('');
-  const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(15);
+  const [itemsPerPage] = useState<number | 'all'>(15); // Fix 2: Removed unused 'setItemsPerPage'
   const [currentPage, setCurrentPage] = useState(1);
 
   // New state for dropdowns
@@ -141,9 +142,9 @@ const RecordHistoryClient = ({ initialRecords, initialError }: RecordHistoryClie
         console.log('Record amount:', amount);
 
         return description.includes(query) ||
-               category.includes(query) ||
-               amount.includes(query) ||
-               date.includes(query);
+          category.includes(query) ||
+          amount.includes(query) ||
+          date.includes(query);
       });
     }
 

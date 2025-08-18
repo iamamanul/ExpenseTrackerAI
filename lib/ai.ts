@@ -9,8 +9,48 @@ interface InsightData {
   confidence?: number;
 }
 
+interface ApiConfig {
+  id: string;
+  name: string;
+  provider: string;
+  limits: string;
+  maxTokens: number;
+  endpoint: string;
+  model: string;
+}
+
+interface GroqResponse {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+}
+
+interface GeminiResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+}
+
+interface TooltipContext {
+  dataIndex: number;
+  parsed: number;
+  label?: string;
+}
+
+interface HealthCheckResult {
+  api: string;
+  status: 'healthy' | 'rate_limited' | 'error';
+  error?: string;
+}
+
 // Define API configurations for independent services
-const API_CONFIGS = [
+const API_CONFIGS: ApiConfig[] = [
   {
     id: 'groq',
     name: 'Groq Llama 3',
@@ -32,7 +72,7 @@ const API_CONFIGS = [
 ];
 
 // Helper function to create AI prompt for insights
-const createInsightPrompt = (records: any[]) => {
+const createInsightPrompt = (records: Record<string, unknown>[]) => {
   return `Analyze these expense records and provide 2-3 financial insights in JSON format: ${JSON.stringify(records.slice(-10))}. 
 
 Return ONLY a valid JSON array with objects containing:
@@ -63,7 +103,7 @@ Question: ${question}`;
 };
 
 // FIXED: Helper function to try Groq API with better error handling
-const tryGroqAPI = async (records: any[]): Promise<InsightData[]> => {
+const tryGroqAPI = async (records: Record<string, unknown>[]): Promise<InsightData[]> => {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error('Groq API key is not configured in environment variables');
@@ -95,12 +135,12 @@ const tryGroqAPI = async (records: any[]): Promise<InsightData[]> => {
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
+    const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
     const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
     throw new Error(`Groq API failed: ${response.status} - ${errorMessage}`);
   }
 
-  const data = await response.json();
+  const data: GroqResponse = await response.json();
   const content = data.choices?.[0]?.message?.content;
   
   if (!content) {
@@ -116,12 +156,12 @@ const tryGroqAPI = async (records: any[]): Promise<InsightData[]> => {
     return parsed;
   } catch (parseError) {
     console.error('❌ Failed to parse JSON from Groq:', content);
-    throw new Error(`Invalid JSON response from Groq API: ${parseError.message}`);
+    throw new Error(`Invalid JSON response from Groq API: ${(parseError as Error).message}`);
   }
 };
 
 // FIXED: Helper function to try Gemini API with better error handling
-const tryGeminiAPI = async (records: any[]): Promise<InsightData[]> => {
+const tryGeminiAPI = async (records: Record<string, unknown>[]): Promise<InsightData[]> => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('Gemini API key is not configured in environment variables');
@@ -149,12 +189,12 @@ const tryGeminiAPI = async (records: any[]): Promise<InsightData[]> => {
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
+    const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
     const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
     throw new Error(`Gemini API failed: ${response.status} - ${errorMessage}`);
   }
 
-  const data = await response.json();
+  const data: GeminiResponse = await response.json();
   const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
   
   if (!content) {
@@ -170,7 +210,7 @@ const tryGeminiAPI = async (records: any[]): Promise<InsightData[]> => {
     return parsed;
   } catch (parseError) {
     console.error('❌ Failed to parse JSON from Gemini:', content);
-    throw new Error(`Invalid JSON response from Gemini API: ${parseError.message}`);
+    throw new Error(`Invalid JSON response from Gemini API: ${(parseError as Error).message}`);
   }
 };
 
@@ -207,12 +247,12 @@ const tryGroqAnswer = async (question: string): Promise<string> => {
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
+    const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
     const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
     throw new Error(`Groq Answer API failed: ${response.status} - ${errorMessage}`);
   }
 
-  const data = await response.json();
+  const data: GroqResponse = await response.json();
   const answer = data.choices?.[0]?.message?.content;
   
   if (!answer) {
@@ -252,12 +292,12 @@ const tryGeminiAnswer = async (question: string): Promise<string> => {
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
+    const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
     const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
     throw new Error(`Gemini Answer API failed: ${response.status} - ${errorMessage}`);
   }
 
-  const data = await response.json();
+  const data: GeminiResponse = await response.json();
   const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
   
   if (!answer) {
@@ -269,7 +309,7 @@ const tryGeminiAnswer = async (question: string): Promise<string> => {
 };
 
 // MAIN FUNCTION: Generate expense insights with independent API fallback
-export async function generateExpenseInsights(records: any[]): Promise<InsightData[]> {
+export async function generateExpenseInsights(records: Record<string, unknown>[]): Promise<InsightData[]> {
   if (!records || records.length === 0) {
     return [{
       id: 'no-data',
@@ -302,16 +342,17 @@ export async function generateExpenseInsights(records: any[]): Promise<InsightDa
       throw new Error('No valid insights returned from Groq API');
     }
     
-  } catch (error: any) {
-    errors.push(`Groq: ${error.message}`);
-    console.log('❌ Groq API failed:', error.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    errors.push(`Groq: ${errorMessage}`);
+    console.log('❌ Groq API failed:', errorMessage);
     
     // Check error type for better logging
-    if (error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
+    if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('rate limit')) {
       console.log('⚠️ Rate limit hit on Groq, trying Gemini...');
-    } else if (error.message?.includes('500') || error.message?.includes('503')) {
+    } else if (errorMessage.includes('500') || errorMessage.includes('503')) {
       console.log('🔧 Server error on Groq, trying Gemini...');
-    } else if (error.message?.includes('API key')) {
+    } else if (errorMessage.includes('API key')) {
       console.log('🔑 API key issue on Groq, trying Gemini...');
     } else {
       console.log('💥 Unknown error on Groq, trying Gemini...');
@@ -339,9 +380,10 @@ export async function generateExpenseInsights(records: any[]): Promise<InsightDa
       throw new Error('No valid insights returned from Gemini API');
     }
     
-  } catch (error: any) {
-    errors.push(`Gemini: ${error.message}`);
-    console.log('❌ Gemini API also failed:', error.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    errors.push(`Gemini: ${errorMessage}`);
+    console.log('❌ Gemini API also failed:', errorMessage);
   }
   
   // If both APIs failed, throw comprehensive error with all details
@@ -368,13 +410,14 @@ export async function generateInsightAnswer(question: string): Promise<string> {
       throw new Error('Empty answer received from Groq');
     }
     
-  } catch (error: any) {
-    errors.push(`Groq: ${error.message}`);
-    console.log('❌ Groq answer failed:', error.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    errors.push(`Groq: ${errorMessage}`);
+    console.log('❌ Groq answer failed:', errorMessage);
     
-    if (error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
+    if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('rate limit')) {
       console.log('⚠️ Rate limit on Groq answer, trying Gemini...');
-    } else if (error.message?.includes('API key')) {
+    } else if (errorMessage.includes('API key')) {
       console.log('🔑 API key issue on Groq answer, trying Gemini...');
     } else {
       console.log('🔄 Groq answer error, trying Gemini...');
@@ -392,9 +435,10 @@ export async function generateInsightAnswer(question: string): Promise<string> {
       throw new Error('Empty answer received from Gemini');
     }
     
-  } catch (error: any) {
-    errors.push(`Gemini: ${error.message}`);
-    console.log('❌ Gemini answer also failed:', error.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    errors.push(`Gemini: ${errorMessage}`);
+    console.log('❌ Gemini answer also failed:', errorMessage);
   }
   
   // If both APIs failed, throw comprehensive error
@@ -407,14 +451,14 @@ export async function generateInsightAnswer(question: string): Promise<string> {
 export const getAPIInfo = () => API_CONFIGS;
 
 // ENHANCED: Helper function to check API health with timeout and better error handling
-export async function checkAPIHealth(apiId?: string, timeoutMs: number = 10000): Promise<{ api: string; status: 'healthy' | 'rate_limited' | 'error'; error?: string }[]> {
+export async function checkAPIHealth(apiId?: string, timeoutMs: number = 10000): Promise<HealthCheckResult[]> {
   const apisToCheck = apiId 
     ? API_CONFIGS.filter(a => a.id === apiId)
     : API_CONFIGS;
   
   const healthChecks = await Promise.allSettled(
     apisToCheck.map(async (apiConfig) => {
-      const checkPromise = async () => {
+      const checkPromise = async (): Promise<HealthCheckResult> => {
         try {
           if (apiConfig.id === 'groq') {
             const apiKey = process.env.GROQ_API_KEY;
@@ -440,7 +484,7 @@ export async function checkAPIHealth(apiId?: string, timeoutMs: number = 10000):
             } else if (response.status === 429) {
               return { api: apiConfig.name, status: 'rate_limited' as const };
             } else {
-              const errorData = await response.json().catch(() => ({}));
+              const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
               return { 
                 api: apiConfig.name, 
                 status: 'error' as const, 
@@ -470,7 +514,7 @@ export async function checkAPIHealth(apiId?: string, timeoutMs: number = 10000):
             } else if (response.status === 429) {
               return { api: apiConfig.name, status: 'rate_limited' as const };
             } else {
-              const errorData = await response.json().catch(() => ({}));
+              const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
               return { 
                 api: apiConfig.name, 
                 status: 'error' as const, 
@@ -485,13 +529,14 @@ export async function checkAPIHealth(apiId?: string, timeoutMs: number = 10000):
             error: 'Unknown API type'
           };
           
-        } catch (error: any) {
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           return {
             api: apiConfig.name,
-            status: error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit') 
+            status: errorMessage.includes('429') || errorMessage.toLowerCase().includes('rate limit') 
               ? 'rate_limited' as const 
               : 'error' as const,
-            error: error.message
+            error: errorMessage
           };
         }
       };
@@ -499,7 +544,7 @@ export async function checkAPIHealth(apiId?: string, timeoutMs: number = 10000):
       // Add timeout to health check
       return Promise.race([
         checkPromise(),
-        new Promise<{ api: string; status: 'error'; error: string }>((_, reject) => 
+        new Promise<HealthCheckResult>((_, reject) => 
           setTimeout(() => reject(new Error('Health check timeout')), timeoutMs)
         )
       ]);
@@ -516,8 +561,6 @@ export async function checkAPIHealth(apiId?: string, timeoutMs: number = 10000):
         }
   );
 }
-
-// Add these functions to your ai.ts file
 
 // Helper function to create category suggestion prompt
 const createCategoryPrompt = (description: string) => {
@@ -579,12 +622,12 @@ const tryGroqCategory = async (description: string): Promise<string> => {
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
+    const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
     const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
     throw new Error(`Groq Category API failed: ${response.status} - ${errorMessage}`);
   }
 
-  const data = await response.json();
+  const data: GroqResponse = await response.json();
   const category = data.choices?.[0]?.message?.content?.trim();
   
   if (!category) {
@@ -630,12 +673,12 @@ const tryGeminiCategory = async (description: string): Promise<string> => {
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
+    const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
     const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
     throw new Error(`Gemini Category API failed: ${response.status} - ${errorMessage}`);
   }
 
-  const data = await response.json();
+  const data: GeminiResponse = await response.json();
   const category = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
   
   if (!category) {
@@ -688,13 +731,14 @@ export async function suggestExpenseCategory(description: string): Promise<{ cat
     console.log('🎉 Successfully suggested category using Groq Llama 3:', category);
     return { category };
     
-  } catch (error: any) {
-    errors.push(`Groq: ${error.message}`);
-    console.log('❌ Groq category suggestion failed:', error.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    errors.push(`Groq: ${errorMessage}`);
+    console.log('❌ Groq category suggestion failed:', errorMessage);
     
-    if (error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
+    if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('rate limit')) {
       console.log('⚠️ Rate limit on Groq category, trying Gemini...');
-    } else if (error.message?.includes('API key')) {
+    } else if (errorMessage.includes('API key')) {
       console.log('🔑 API key issue on Groq category, trying Gemini...');
     } else {
       console.log('🔄 Groq category error, trying Gemini...');
@@ -708,9 +752,10 @@ export async function suggestExpenseCategory(description: string): Promise<{ cat
     console.log('🎉 Successfully suggested category using Gemini (fallback):', category);
     return { category };
     
-  } catch (error: any) {
-    errors.push(`Gemini: ${error.message}`);
-    console.log('❌ Gemini category suggestion also failed:', error.message);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    errors.push(`Gemini: ${errorMessage}`);
+    console.log('❌ Gemini category suggestion also failed:', errorMessage);
   }
   
   // If both AI APIs failed, use simple rule-based approach

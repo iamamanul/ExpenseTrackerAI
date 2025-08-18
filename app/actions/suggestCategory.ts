@@ -15,7 +15,7 @@ export async function suggestCategory(description: string) {
 
     // Call the AI function
     const result = await suggestExpenseCategory(description.trim());
-    
+
     if (result.error) {
       console.error('Category suggestion error:', result.error);
       return { error: 'Unable to suggest category at this time' };
@@ -27,8 +27,7 @@ export async function suggestCategory(description: string) {
 
     // Fallback if no category is returned
     return { error: 'Unable to suggest category at this time' };
-
-  } catch (error: any) {
+  } catch (error: unknown) { // Changed 'any' to 'unknown'
     console.error('Server action error in suggestCategory:', error);
     return { error: 'Unable to suggest category at this time' };
   }
