@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react'; // Fix 1: Removed unused 'useCallback'
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -15,8 +15,8 @@ import {
   Legend,
   Filler,
   TimeScale,
-  type ChartOptions, // Fix 5: Imported ChartOptions type
-  type TooltipItem,   // Fix 6 & 7: Imported TooltipItem type
+  type ChartOptions,
+  type TooltipItem,
 } from 'chart.js';
 
 // Simple emoji "icons"
@@ -44,49 +44,42 @@ ChartJS.register(
   TimeScale
 );
 
-// Sample data - replace with your actual data (using more recent dates for testing)
+// Sample data - replace with your actual data
 const sampleRecords = [
-  // Recent data (last 7 days)
-  { date: '2025-08-17', amount: 150, category: 'Food' },
-  { date: '2025-08-16', amount: 3000, category: 'Bills' },
-  { date: '2025-08-15', amount: 50, category: 'Transportation' },
-  { date: '2025-08-14', amount: 200, category: 'Food' },
-  { date: '2025-08-13', amount: 800, category: 'Shopping' },
-  { date: '2025-08-12', amount: 120, category: 'Entertainment' },
-  { date: '2025-08-11', amount: 300, category: 'Food' },
-
-  // Last 30 days data
-  { date: '2025-08-08', amount: 45, category: 'Transportation' },
-  { date: '2025-08-05', amount: 1200, category: 'Shopping' },
-  { date: '2025-08-02', amount: 75, category: 'Food' },
-  { date: '2025-07-30', amount: 500, category: 'Entertainment' },
-  { date: '2025-07-28', amount: 250, category: 'Food' },
-  { date: '2025-07-25', amount: 60, category: 'Transportation' },
-  { date: '2025-07-22', amount: 2000, category: 'Bills' },
-  { date: '2025-07-20', amount: 180, category: 'Food' },
-
-  // Last 90 days data
-  { date: '2025-06-15', amount: 90, category: 'Transportation' },
-  { date: '2025-06-10', amount: 400, category: 'Food' },
-  { date: '2025-06-05', amount: 1500, category: 'Shopping' },
-  { date: '2025-05-30', amount: 220, category: 'Entertainment' },
-  { date: '2025-05-25', amount: 85, category: 'Food' },
-  { date: '2025-05-20', amount: 350, category: 'Food' },
-
-  // Older data (beyond 90 days)
-  { date: '2024-12-01', amount: 120, category: 'Transportation' },
-  { date: '2024-11-15', amount: 800, category: 'Shopping' },
-  { date: '2024-10-20', amount: 150, category: 'Entertainment' },
-  { date: '2024-09-10', amount: 600, category: 'Bills' },
-  { date: '2024-08-05', amount: 280, category: 'Food' },
-  { date: '2024-07-01', amount: 95, category: 'Transportation' },
-  { date: '2024-06-15', amount: 450, category: 'Food' },
-  { date: '2024-05-20', amount: 1100, category: 'Shopping' },
-  { date: '2024-04-10', amount: 320, category: 'Entertainment' },
-  { date: '2024-03-15', amount: 250, category: 'Healthcare' },
-  { date: '2024-02-01', amount: 180, category: 'Healthcare' },
-  { date: '2024-01-20', amount: 90, category: 'Other' },
-  { date: '2024-01-15', amount: 120, category: 'Other' },
+    { date: '2025-08-17', amount: 150, category: 'Food' },
+    { date: '2025-08-16', amount: 3000, category: 'Bills' },
+    { date: '2025-08-15', amount: 50, category: 'Transportation' },
+    { date: '2025-08-14', amount: 200, category: 'Food' },
+    { date: '2025-08-13', amount: 800, category: 'Shopping' },
+    { date: '2025-08-12', amount: 120, category: 'Entertainment' },
+    { date: '2025-08-11', amount: 300, category: 'Food' },
+    { date: '2025-08-08', amount: 45, category: 'Transportation' },
+    { date: '2025-08-05', amount: 1200, category: 'Shopping' },
+    { date: '2025-08-02', amount: 75, category: 'Food' },
+    { date: '2025-07-30', amount: 500, category: 'Entertainment' },
+    { date: '2025-07-28', amount: 250, category: 'Food' },
+    { date: '2025-07-25', amount: 60, category: 'Transportation' },
+    { date: '2025-07-22', amount: 2000, category: 'Bills' },
+    { date: '2025-07-20', amount: 180, category: 'Food' },
+    { date: '2025-06-15', amount: 90, category: 'Transportation' },
+    { date: '2025-06-10', amount: 400, category: 'Food' },
+    { date: '2025-06-05', amount: 1500, category: 'Shopping' },
+    { date: '2025-05-30', amount: 220, category: 'Entertainment' },
+    { date: '2025-05-25', amount: 85, category: 'Food' },
+    { date: '2025-05-20', amount: 350, category: 'Food' },
+    { date: '2024-12-01', amount: 120, category: 'Transportation' },
+    { date: '2024-11-15', amount: 800, category: 'Shopping' },
+    { date: '2024-10-20', amount: 150, category: 'Entertainment' },
+    { date: '2024-09-10', amount: 600, category: 'Bills' },
+    { date: '2024-08-05', amount: 280, category: 'Food' },
+    { date: '2024-07-01', amount: 95, category: 'Transportation' },
+    { date: '2024-06-15', amount: 450, category: 'Food' },
+    { date: '2024-05-20', amount: 1100, category: 'Shopping' },
+    { date: '2024-04-10', amount: 320, category: 'Entertainment' },
+    { date: '2024-03-15', amount: 250, category: 'Healthcare' },
+    { date: '2024-02-01', amount: 180, category: 'Healthcare' },
+    { date: '2024-01-20', amount: 90, category: 'Other' },
+    { date: '2024-01-15', amount: 120, category: 'Other' },
 ];
 
 interface Record {
@@ -95,7 +88,6 @@ interface Record {
   category: string;
 }
 
-// Category mapping with emojis and display names
 const categoryMapping = {
   Food: { emoji: '🍔', name: 'Food & Dining' },
   Transportation: { emoji: '🚗', name: 'Transportation' },
@@ -106,18 +98,16 @@ const categoryMapping = {
   Other: { emoji: '📦', name: 'Other' },
 };
 
-// Date filter options
 const dateFilterOptions = [
-  { value: 'all', label: 'All Time', group: 'All Data' },
-  { value: '7d', label: 'Last 7 days', group: 'Past Records' },
-  { value: '30d', label: 'Last 30 days', group: 'Past Records' },
-  { value: '90d', label: 'Last 90 days', group: 'Past Records' },
-  { value: 'next7d', label: 'Next 7 days', group: 'Future Records' },
-  { value: 'next30d', label: 'Next 30 days', group: 'Future Records' },
-  { value: 'next90d', label: 'Next 90 days', group: 'Future Records' },
+    { value: 'all', label: 'All Time', group: 'All Data' },
+    { value: '7d', label: 'Last 7 days', group: 'Past Records' },
+    { value: '30d', label: 'Last 30 days', group: 'Past Records' },
+    { value: '90d', label: 'Last 90 days', group: 'Past Records' },
+    { value: 'next7d', label: 'Next 7 days', group: 'Future Records' },
+    { value: 'next30d', label: 'Next 30 days', group: 'Future Records' },
+    { value: 'next90d', label: 'Next 90 days', group: 'Future Records' },
 ];
 
-// Fix 11: Added a type alias for better readability
 type TimeRangeOption = '7d' | '30d' | '90d' | 'next7d' | 'next30d' | 'next90d' | 'all';
 
 const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
@@ -126,13 +116,13 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
   const [isDark, setIsDark] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(6);
-  const [isMobile, setIsMobile] = useState(false); // Fix 2: This state is now used correctly
+  const [isMobile, setIsMobile] = useState(false);
 
-  // State for dropdown animation
   const [isTimeRangeDropdownOpen, setIsTimeRangeDropdownOpen] = useState(false);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
 
-  const chartRef = useRef<ChartJS<'bar' | 'line' | 'doughnut'> | null>(null); // Fix 3: Replaced 'any' with ChartJS type
+  // FIX: Made the ref type more general to be compatible with all chart types
+  const chartRef = useRef<ChartJS | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const timeRangeDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -141,41 +131,35 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
   useEffect(() => {
     setMounted(true);
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768); // Tailwind's md breakpoint is 768px
+      setIsMobile(window.innerWidth < 768);
     };
 
-    handleResize(); // Set initial state
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Handle clicks outside of dropdown
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
-      if (
-        timeRangeDropdownRef.current && !timeRangeDropdownRef.current.contains(event.target as Node)
-      ) {
-        // Start the fade-out animation
-        if (isTimeRangeDropdownOpen) {
-          setIsAnimatingOut(true);
+        if (timeRangeDropdownRef.current && !timeRangeDropdownRef.current.contains(event.target as Node)) {
+            if (isTimeRangeDropdownOpen) {
+                setIsAnimatingOut(true);
+            }
         }
-      }
     };
-
     document.addEventListener('mousedown', handleOutsideClick);
     return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
+        document.removeEventListener('mousedown', handleOutsideClick);
     };
   }, [isTimeRangeDropdownOpen]);
 
-  // Handle the fade-out animation before unmounting
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     if (isAnimatingOut) {
-      timeoutId = setTimeout(() => {
-        setIsTimeRangeDropdownOpen(false);
-        setIsAnimatingOut(false);
-      }, 200); // Match this duration to the animation-duration in the CSS
+        timeoutId = setTimeout(() => {
+            setIsTimeRangeDropdownOpen(false);
+            setIsAnimatingOut(false);
+        }, 200);
     }
     return () => clearTimeout(timeoutId);
   }, [isAnimatingOut]);
@@ -190,70 +174,54 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
     const now = new Date();
     const filtered = dataRecords.filter((r) => {
       if (timeRange === 'all') return true;
-
       const recordDate = new Date(r.date);
       const timeDiff = recordDate.getTime() - now.getTime();
       const daysDiff = Math.floor(timeDiff / (24 * 60 * 60 * 1000));
-
       if (timeRange === '7d') return daysDiff >= -7 && daysDiff <= 0;
       if (timeRange === '30d') return daysDiff >= -30 && daysDiff <= 0;
       if (timeRange === '90d') return daysDiff >= -90 && daysDiff <= 0;
-
       if (timeRange === 'next7d') return daysDiff >= 0 && daysDiff <= 7;
       if (timeRange === 'next30d') return daysDiff >= 0 && daysDiff <= 30;
       if (timeRange === 'next90d') return daysDiff >= 0 && daysDiff <= 90;
-
       return true;
     });
-
-    const dateMap = new Map<
-      string,
-      { date: string; amount: number; categories: Set<string>; records: Record[] }
-    >();
+    const dateMap = new Map<string, { date: string; amount: number; categories: Set<string>; records: Record[] }>();
     filtered.forEach((rec) => {
-      const dateKey = new Date(rec.date).toISOString().split('T')[0];
-      if (!dateMap.has(dateKey)) {
-        dateMap.set(dateKey, { date: dateKey, amount: 0, categories: new Set(), records: [] });
-      }
-      const day = dateMap.get(dateKey)!;
-      day.amount += rec.amount;
-      day.categories.add(rec.category);
-      day.records.push(rec);
+        const dateKey = new Date(rec.date).toISOString().split('T')[0];
+        if (!dateMap.has(dateKey)) {
+            dateMap.set(dateKey, { date: dateKey, amount: 0, categories: new Set(), records: [] });
+        }
+        const day = dateMap.get(dateKey)!;
+        day.amount += rec.amount;
+        day.categories.add(rec.category);
+        day.records.push(rec);
     });
     const dailyData = Array.from(dateMap.values()).sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
-
     const categoryMap = new Map<string, number>();
     const categoryRecords = new Map<string, Record[]>();
     filtered.forEach((rec) => {
-      if (!categoryMap.has(rec.category)) {
-        categoryMap.set(rec.category, 0);
-        categoryRecords.set(rec.category, []);
-      }
-      categoryMap.set(rec.category, (categoryMap.get(rec.category) || 0) + rec.amount);
-      categoryRecords.get(rec.category)!.push(rec);
+        if (!categoryMap.has(rec.category)) {
+            categoryMap.set(rec.category, 0);
+            categoryRecords.set(rec.category, []);
+        }
+        categoryMap.set(rec.category, (categoryMap.get(rec.category) || 0) + rec.amount);
+        categoryRecords.get(rec.category)!.push(rec);
     });
-
     const allCategories = Object.keys(categoryMapping);
     const categoryData = allCategories.map((cat) => ({
-      category: cat,
-      amount: categoryMap.get(cat) || 0,
-      records: categoryRecords.get(cat) || [],
-      count: (categoryRecords.get(cat) || []).length,
+        category: cat,
+        amount: categoryMap.get(cat) || 0,
+        records: categoryRecords.get(cat) || [],
+        count: (categoryRecords.get(cat) || []).length,
     }));
-
     return {
-      daily: dailyData,
-      categories: categoryData,
-      totalAmount: filtered.reduce((s, r) => s + r.amount, 0),
-      avgDaily:
-        dailyData.length > 0 ? dailyData.reduce((s, d) => s + d.amount, 0) / dailyData.length : 0,
-      avgCategory:
-        categoryData.filter((c) => c.amount > 0).length > 0
-          ? categoryData.reduce((s, c) => s + c.amount, 0) /
-          categoryData.filter((c) => c.amount > 0).length
-          : 0,
+        daily: dailyData,
+        categories: categoryData,
+        totalAmount: filtered.reduce((s, r) => s + r.amount, 0),
+        avgDaily: dailyData.length > 0 ? dailyData.reduce((s, d) => s + d.amount, 0) / dailyData.length : 0,
+        avgCategory: categoryData.filter((c) => c.amount > 0).length > 0 ? categoryData.reduce((s, c) => s + c.amount, 0) / categoryData.filter((c) => c.amount > 0).length : 0,
     };
   }, [dataRecords, timeRange]);
 
@@ -282,10 +250,9 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
 
   const getChartData = () => {
     if (chartType === 'bar' || chartType === 'line') {
-      // Fix 2: Removed local 'isMobile' variable to use the one from component state
       return {
         labels: visibleData.map((item) => {
-          const info = categoryMapping[item.category as keyof typeof categoryMapping] || {}; // Fix 4: Replaced 'any' with type-safe access
+          const info = categoryMapping[item.category as keyof typeof categoryMapping] || {};
           const label = `${info.emoji || '📦'} ${info.name || item.category}`;
           return isMobile && label.length > 15 ? label.substring(0, 15) + '...' : label;
         }),
@@ -300,8 +267,8 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
               ? {
                 borderRadius: 6,
                 borderSkipped: false as const,
-                barThickness: isMobile ? 20 : 60, // Smaller bars for mobile
-                maxBarThickness: isMobile ? 30 : 80, // Smaller bars for mobile
+                barThickness: isMobile ? 20 : 60,
+                maxBarThickness: isMobile ? 30 : 80,
                 categoryPercentage: 0.8,
                 barPercentage: 0.9,
               }
@@ -322,7 +289,7 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
     const categoriesWithData = processedData.categories.filter((c) => c.amount > 0);
     return {
       labels: categoriesWithData.map((item) => {
-        const info = categoryMapping[item.category as keyof typeof categoryMapping] || {}; // Fix 9: Replaced 'any' with type-safe access
+        const info = categoryMapping[item.category as keyof typeof categoryMapping] || {};
         return `${info.emoji || '📦'} ${info.name || item.category}`;
       }),
       datasets: [
@@ -337,9 +304,8 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
     };
   };
 
-  const getChartOptions = () => {
-    // Fix 2: Removed local 'isMobile' variable to use the one from component state
-    const baseOptions: ChartOptions<'bar' | 'line' | 'doughnut'> = { // Fix 5: Replaced 'any' with ChartOptions type
+  const getChartOptions = (): ChartOptions<'bar' | 'line' | 'doughnut'> => {
+    const baseOptions: ChartOptions<'bar' | 'line' | 'doughnut'> = {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { intersect: false, mode: 'index' as const },
@@ -367,18 +333,18 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
           padding: 12,
           displayColors: true,
           callbacks: {
-            title: (ctx: TooltipItem<'bar' | 'line' | 'doughnut'>[]) => { // Fix 6: Replaced 'any' with TooltipItem[]
+            title: (ctx: TooltipItem<'bar' | 'line' | 'doughnut'>[]) => {
               if (chartType === 'bar' || chartType === 'line') {
                 const idx = ctx[0]?.dataIndex;
                 if (idx !== undefined && visibleData[idx]) {
                   const cat = visibleData[idx].category;
-                  const info = categoryMapping[cat as keyof typeof categoryMapping] || {}; // Fix 8: Replaced 'any' with type-safe access
+                  const info = categoryMapping[cat as keyof typeof categoryMapping] || {};
                   return `${info.emoji || '📦'} ${info.name || cat}`;
                 }
               }
               return ctx[0]?.label || '';
             },
-            label: (ctx: TooltipItem<'bar' | 'line' | 'doughnut'>) => { // Fix 7: Replaced 'any' with TooltipItem
+            label: (ctx: TooltipItem<'bar' | 'line' | 'doughnut'>) => {
               if (chartType === 'doughnut') {
                 const total = processedData.totalAmount || 1;
                 const pct = ((ctx.parsed as number / total) * 100).toFixed(1);
@@ -418,7 +384,7 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
           ticks: {
             color: isDark ? '#9ca3af' : '#6b7280',
             font: { size: isMobile ? 8 : 11 },
-            maxRotation: isMobile ? 90 : 45, // Rotate labels more on mobile
+            maxRotation: isMobile ? 90 : 45,
             minRotation: isMobile ? 90 : 0,
             padding: 8,
           },
@@ -434,12 +400,11 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
           ticks: {
             color: isDark ? '#9ca3af' : '#6b7280',
             font: { size: isMobile ? 8 : 11 },
-            callback: (v: string | number) => '₹' + Number(v).toLocaleString(), // Fix 10: Replaced 'any' with 'string | number'
+            callback: (v: string | number) => '₹' + Number(v).toLocaleString(),
           },
           beginAtZero: true,
         },
       };
-      // Ensure indexAxis is always 'x' for vertical bar charts
       baseOptions.indexAxis = 'x';
     }
 
@@ -463,7 +428,6 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
     };
   }, [processedData]);
 
-  // Find current time range option
   const currentTimeRangeOption = dateFilterOptions.find(option => option.value === timeRange);
 
   if (!mounted) {
@@ -511,7 +475,6 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
           animation: fadeOut 0.2s ease-out forwards;
         }
       `}</style>
-      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 space-y-4 md:space-y-0">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
@@ -521,7 +484,6 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
             Category-wise expense tracking and visualization
           </p>
         </div>
-
         <div className="flex items-center space-x-4">
           <button
             onClick={() => setIsDark(!isDark)}
@@ -529,27 +491,24 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
           >
             {isDark ? '🌞' : '🌙'}
           </button>
-
-          {/* New Time Range Dropdown */}
           <div className="relative" ref={timeRangeDropdownRef}>
             <button
-              type="button"
-              className={`w-full flex justify-between items-center py-2 px-4 rounded-lg transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-900 hover:bg-gray-100'
-                } border`}
-              onClick={() => {
-                if (isTimeRangeDropdownOpen) {
-                  setIsAnimatingOut(true);
-                } else {
-                  setIsTimeRangeDropdownOpen(true);
-                }
-              }}
+                type="button"
+                className={`w-full flex justify-between items-center py-2 px-4 rounded-lg transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-900 hover:bg-gray-100'} border`}
+                onClick={() => {
+                    if (isTimeRangeDropdownOpen) {
+                        setIsAnimatingOut(true);
+                    } else {
+                        setIsTimeRangeDropdownOpen(true);
+                    }
+                }}
             >
-              <span>{currentTimeRangeOption?.label}</span>
-              <span className={`transition-transform duration-200 ${isTimeRangeDropdownOpen && !isAnimatingOut ? 'rotate-180' : 'rotate-0'}`}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                </svg>
-              </span>
+                <span>{currentTimeRangeOption?.label}</span>
+                <span className={`transition-transform duration-200 ${isTimeRangeDropdownOpen && !isAnimatingOut ? 'rotate-180' : 'rotate-0'}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </span>
             </button>
 
             {isTimeRangeDropdownOpen && (
@@ -577,7 +536,7 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
                         <button
                           key={option.value}
                           onClick={() => {
-                            setTimeRange(option.value as TimeRangeOption); // Fix 11: Replaced 'any' with TimeRangeOption
+                            setTimeRange(option.value as TimeRangeOption);
                             setIsAnimatingOut(true);
                           }}
                           className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg transition-colors duration-200 ${timeRange === option.value
@@ -596,8 +555,6 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
           </div>
         </div>
       </div>
-
-      {/* Statistics Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-8">
         <div className={`p-3 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-blue-50'} border ${isDark ? 'border-gray-700' : 'border-blue-200'}`}>
           <div className="flex items-center justify-between">
@@ -651,8 +608,6 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
           </div>
         </div>
       </div>
-
-      {/* Chart Controls */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-6 space-y-4 md:space-y-0">
         <div className={`flex w-fit rounded-xl p-1 space-x-0 px-1 py-2 ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
           <button
@@ -686,7 +641,6 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
             <span>Doughnut</span>
           </button>
         </div>
-
         <div className={`px-3 py-2 text-sm rounded-lg ${isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
           {(chartType === 'bar' || chartType === 'line')
             ? `Showing expenses by category (${processedData.categories.filter(c => c.amount > 0).length} categories with data)`
@@ -699,8 +653,6 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
           </span>
         </div>
       </div>
-
-      {/* Zoom and Navigation controls for bar/line */}
       {(chartType === 'bar' || chartType === 'line') && (
         <div className="flex flex-col sm:flex-row items-center justify-between mb-4 space-y-2 sm:space-y-0">
           <div className="flex items-center gap-2">
@@ -710,8 +662,7 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
             <button
               onClick={handleZoomOut}
               disabled={zoomLevel >= 10}
-              className={`p-2 rounded-lg border text-sm transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-800 hover:bg-gray-50'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              className={`p-2 rounded-lg border text-sm transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-800 hover:bg-gray-50'} disabled:opacity-50 disabled:cursor-not-allowed`}
               title="Zoom Out (show more items)"
             >
               <ZoomOut size={16} />
@@ -719,8 +670,7 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
             <button
               onClick={handleZoomIn}
               disabled={zoomLevel <= 2}
-              className={`p-2 rounded-lg border text-sm transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-800 hover:bg-gray-50'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              className={`p-2 rounded-lg border text-sm transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-800 hover:bg-gray-50'} disabled:opacity-50 disabled:cursor-not-allowed`}
               title="Zoom In (show fewer items)"
             >
               <ZoomIn size={16} />
@@ -732,8 +682,7 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
               <button
                 onClick={handlePrev}
                 disabled={clampedOffset === 0}
-                className={`px-3 py-2 rounded-lg border text-sm flex items-center gap-1 transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-800 hover:bg-gray-50'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`px-3 py-2 rounded-lg border text-sm flex items-center gap-1 transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-800 hover:bg-gray-50'} disabled:opacity-50 disabled:cursor-not-allowed`}
                 aria-label="Previous items"
               >
                 <ChevronLeft size={16} /> Prev
@@ -744,8 +693,7 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
               <button
                 onClick={handleNext}
                 disabled={clampedOffset >= maxOffset}
-                className={`px-3 py-2 rounded-lg border text-sm flex items-center gap-1 transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-800 hover:bg-gray-50'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`px-3 py-2 rounded-lg border text-sm flex items-center gap-1 transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-800 hover:bg-gray-50'} disabled:opacity-50 disabled:cursor-not-allowed`}
                 aria-label="Next items"
               >
                 Next <ChevronRight size={16} />
@@ -754,8 +702,6 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
           )}
         </div>
       )}
-
-      {/* Chart Container */}
       <div className="overflow-hidden">
         <div
           ref={containerRef}
@@ -783,8 +729,6 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
           )}
         </div>
       </div>
-
-      {/* Progress Bar for Scrolling */}
       {(chartType === 'bar' || chartType === 'line') && needsScrolling && totalItems > 0 && (
         <div className="mt-4 overflow-hidden">
           <div className={`w-full h-2 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`}>
@@ -806,8 +750,6 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
           </div>
         </div>
       )}
-
-      {/* Keyboard Controls Hint */}
       {(chartType === 'bar' || chartType === 'line') && (
         <div className={`mt-4 p-3 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-100'} border ${isDark ? 'border-gray-700' : 'border-gray-200'} overflow-hidden`}>
           <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'} text-center`}>
@@ -815,8 +757,6 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
           </p>
         </div>
       )}
-
-      {/* Data Summary for Current View */}
       {(chartType === 'bar' || chartType === 'line') && visibleData.length > 0 && (
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden">
           <div className={`p-4 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-50'} border ${isDark ? 'border-gray-700' : 'border-gray-200'} overflow-hidden`}>
