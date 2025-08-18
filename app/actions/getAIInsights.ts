@@ -2,9 +2,20 @@
 
 import { checkUser } from '@/lib/checkUser';
 import { db } from '@/lib/db';
-import { generateExpenseInsights, AIInsight, ExpenseRecord } from '@/lib/ai';
+// Fix 1: Renamed AIInsight to InsightData and removed ExpenseRecord from import
+import { generateExpenseInsights, InsightData } from '@/lib/ai';
 
-export async function getAIInsights(): Promise<AIInsight[]> {
+// Fix 2: Defined the ExpenseRecord type here, as it's not exported from lib/ai.ts
+interface ExpenseRecord {
+  id: string;
+  amount: number;
+  category: string;
+  description: string | null;
+  date: string;
+}
+
+// Fix 3: Updated the function's return type to use InsightData
+export async function getAIInsights(): Promise<InsightData[]> {
   try {
     const user = await checkUser();
     if (!user) {

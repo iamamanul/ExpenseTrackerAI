@@ -1,6 +1,6 @@
 // lib/ai.ts - Fixed with Better Error Handling and Independent API Fallback
 
-interface InsightData {
+export interface InsightData {
   id: string;
   type: 'warning' | 'info' | 'success' | 'tip';
   title: string;
