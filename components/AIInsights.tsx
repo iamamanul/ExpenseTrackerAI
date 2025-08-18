@@ -174,7 +174,7 @@ Requirements:
 const generateAIAnswer = async (question: string, preferredAPI: APIProvider): Promise<{ answer: string, usedAPI: APIProvider }> => {
   const timeoutMs = 15000; // 15 second timeout
   
-  const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
+  const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
     return Promise.race([
       promise,
       new Promise<T>((_, reject) => 
