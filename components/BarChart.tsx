@@ -17,6 +17,7 @@ import {
   TimeScale,
   type ChartOptions,
   type TooltipItem,
+  ChartType,
 } from 'chart.js';
 
 // Simple emoji "icons"
@@ -121,11 +122,12 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
   const [isTimeRangeDropdownOpen, setIsTimeRangeDropdownOpen] = useState(false);
   const [isAnimatingOut, setIsAnimatingOut] = useState(false);
 
-  // FIX: Create a separate, correctly typed ref for each chart type
+  // FIX 1: Restored separate, correctly-typed refs for each chart.
+  // A single generic ref is not type-compatible with the specific chart components.
   const barChartRef = useRef<ChartJS<'bar'> | null>(null);
   const lineChartRef = useRef<ChartJS<'line'> | null>(null);
   const doughnutChartRef = useRef<ChartJS<'doughnut'> | null>(null);
-
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const timeRangeDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -268,22 +270,22 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
             borderWidth: 2,
             ...(chartType === 'bar'
               ? {
-                borderRadius: 6,
-                borderSkipped: false as const,
-                barThickness: isMobile ? 20 : 60,
-                maxBarThickness: isMobile ? 30 : 80,
-                categoryPercentage: 0.8,
-                barPercentage: 0.9,
-              }
+                  borderRadius: 6,
+                  borderSkipped: false as const,
+                  barThickness: isMobile ? 20 : 60,
+                  maxBarThickness: isMobile ? 30 : 80,
+                  categoryPercentage: 0.8,
+                  barPercentage: 0.9,
+                }
               : {
-                fill: true,
-                tension: 0.3,
-                pointBackgroundColor: visibleData.map((_, i) => colors[i % colors.length]),
-                pointBorderColor: '#ffffff',
-                pointBorderWidth: 2,
-                pointRadius: 8,
-                pointHoverRadius: 12,
-              }),
+                  fill: true,
+                  tension: 0.3,
+                  pointBackgroundColor: visibleData.map((_, i) => colors[i % colors.length]),
+                  pointBorderColor: '#ffffff',
+                  pointBorderWidth: 2,
+                  pointRadius: 8,
+                  pointHoverRadius: 12,
+                }),
           },
         ],
       };
@@ -307,7 +309,7 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
     };
   };
 
-  const getChartOptions = (): ChartOptions<'bar' | 'line' | 'doughnut'> => {
+  const getChartOptions = (): ChartOptions<ChartType> => {
     const baseOptions: ChartOptions<'bar' | 'line' | 'doughnut'> = {
       responsive: true,
       maintainAspectRatio: false,
@@ -451,9 +453,260 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
   return (
     <div className={`w-full max-w-6xl mx-auto p-4 md:p-6 rounded-xl ${isDark ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'} shadow-2xl overflow-hidden`}>
       <style jsx>{`
-        /* ... styles ... */
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        @keyframes fadeOut {
+          from {
+            opacity: 1;
+            transform: scale(1);
+          }
+          to {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out forwards;
+        }
+        .animate-fadeOut {
+          animation: fadeOut 0.2s ease-out forwards;
+        }
       `}</style>
-      {/* ... header and stats ... */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 space-y-4 md:space-y-0">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+            Financial Dashboard
+          </h2>
+          <p className={`text-sm mt-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            Category-wise expense tracking and visualization
+          </p>
+        </div>
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => setIsDark(!isDark)}
+            className={`px-4 py-2 rounded-lg transition-all duration-200 ${isDark ? 'bg-gray-800 hover:bg-gray-700' : 'bg-gray-100 hover:bg-gray-200'}`}
+          >
+            {isDark ? '🌞' : '🌙'}
+          </button>
+          <div className="relative" ref={timeRangeDropdownRef}>
+            <button
+                type="button"
+                className={`w-full flex justify-between items-center py-2 px-4 rounded-lg transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-900 hover:bg-gray-100'} border`}
+                onClick={() => {
+                    if (isTimeRangeDropdownOpen) {
+                        setIsAnimatingOut(true);
+                    } else {
+                        setIsTimeRangeDropdownOpen(true);
+                    }
+                }}
+            >
+                <span>{currentTimeRangeOption?.label}</span>
+                <span className={`transition-transform duration-200 ${isTimeRangeDropdownOpen && !isAnimatingOut ? 'rotate-180' : 'rotate-0'}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                  </svg>
+                </span>
+            </button>
+
+            {isTimeRangeDropdownOpen && (
+              <div
+                className={`absolute top-full mt-2 z-10 
+                  w-[90vw] max-w-sm md:w-96 
+                  left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-0
+                  bg-white dark:bg-gray-800 
+                  border border-gray-200/60 dark:border-gray-700/60 
+                  rounded-xl sm:rounded-2xl 
+                  shadow-lg origin-top-right 
+                  ${isAnimatingOut ? 'animate-fadeOut' : 'animate-fadeIn'}`}
+                onAnimationEnd={() => {
+                  if (isAnimatingOut) {
+                    setIsTimeRangeDropdownOpen(false);
+                    setIsAnimatingOut(false);
+                  }
+                }}
+              >
+                <div className="p-2">
+                  {['Past Records', 'Future Records', 'All Data'].map(group => (
+                    <React.Fragment key={group}>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 px-3 py-1 font-bold uppercase tracking-wider mt-2 first:mt-0">{group}</div>
+                      {dateFilterOptions.filter(opt => opt.group === group).map(option => (
+                        <button
+                          key={option.value}
+                          onClick={() => {
+                            setTimeRange(option.value as TimeRangeOption);
+                            setIsAnimatingOut(true);
+                          }}
+                          className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg transition-colors duration-200 ${timeRange === option.value
+                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            }`}
+                        >
+                          <span className="flex-1">{option.label}</span>
+                        </button>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 mb-8">
+        <div className={`p-3 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-blue-50'} border ${isDark ? 'border-gray-700' : 'border-blue-200'}`}>
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-blue-600'}`}>Total</p>
+              <p className="text-sm sm:text-base md:text-xl font-bold truncate">
+                ₹{stats.total.toLocaleString()}
+              </p>
+            </div>
+            <span>💰</span>
+          </div>
+        </div>
+
+        <div className={`p-3 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-green-50'} border ${isDark ? 'border-gray-700' : 'border-green-200'}`}>
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-green-600'}`}>Avg/Category</p>
+              <p className="text-lg md:text-xl font-bold truncate">₹{Math.round(stats.average).toLocaleString()}</p>
+            </div>
+            <TrendingUp size={24} />
+          </div>
+        </div>
+
+        <div className={`p-3 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-red-50'} border ${isDark ? 'border-gray-700' : 'border-red-200'}`}>
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-red-600'}`}>Highest</p>
+              <p className="text-lg md:text-xl font-bold truncate">₹{stats.highest.toLocaleString()}</p>
+            </div>
+            <span>🔺</span>
+          </div>
+        </div>
+
+        <div className={`p-3 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-yellow-50'} border ${isDark ? 'border-gray-700' : 'border-yellow-200'}`}>
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-yellow-600'}`}>Lowest</p>
+              <p className="text-lg md:text-xl font-bold truncate">₹{stats.lowest.toLocaleString()}</p>
+            </div>
+            <TrendingDown size={24} />
+          </div>
+        </div>
+
+        <div className={`p-3 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-purple-50'} border ${isDark ? 'border-gray-700' : 'border-purple-200'}`}>
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-purple-600'}`}>Categories Used</p>
+              <p className="text-lg md:text-xl font-bold truncate">{stats.categoriesUsed}</p>
+            </div>
+            <Calendar size={24} />
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 space-y-4 md:space-y-0">
+        <div className={`flex w-fit rounded-xl p-1 space-x-0 px-1 py-2 ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
+          <button
+            onClick={() => setChartType('bar')}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${chartType === 'bar'
+              ? `${isDark ? 'bg-blue-600' : 'bg-blue-500'} text-white shadow-lg`
+              : `${isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200'}`
+              }`}
+          >
+            <BarChart3 />
+            <span>Bar</span>
+          </button>
+          <button
+            onClick={() => setChartType('line')}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${chartType === 'line'
+              ? `${isDark ? 'bg-blue-600' : 'bg-blue-500'} text-white shadow-lg`
+              : `${isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200'}`
+              }`}
+          >
+            <Activity />
+            <span>Line</span>
+          </button>
+          <button
+            onClick={() => setChartType('doughnut')}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${chartType === 'doughnut'
+              ? `${isDark ? 'bg-blue-600' : 'bg-blue-500'} text-white shadow-lg`
+              : `${isDark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-200'}`
+              }`}
+          >
+            <div className="w-4 h-4 border-2 border-current border-r-transparent rounded-full" />
+            <span>Doughnut</span>
+          </button>
+        </div>
+        <div className={`px-3 py-2 text-sm rounded-lg ${isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+          {(chartType === 'bar' || chartType === 'line')
+            ? `Showing expenses by category (${processedData.categories.filter(c => c.amount > 0).length} categories with data)`
+            : `Showing category distribution (${processedData.categories.filter((c) => c.amount > 0).length} with data)`}
+          <br />
+          <span className="text-xs opacity-75">
+            {timeRange.startsWith('next') ? '📅 Future' : timeRange === 'all' ? '📊 All Time' : '📈 Past'} |
+            Records: {processedData.daily.reduce((sum, day) => sum + day.records.length, 0)} |
+            Total: ₹{processedData.totalAmount.toLocaleString()}
+          </span>
+        </div>
+      </div>
+      {(chartType === 'bar' || chartType === 'line') && (
+        <div className="flex flex-col sm:flex-row items-center justify-between mb-4 space-y-2 sm:space-y-0">
+          <div className="flex items-center gap-2">
+            <span className={`hidden sm:inline text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              Zoom: {MAX_VISIBLE_BARS} items
+            </span>
+            <button
+              onClick={handleZoomOut}
+              disabled={zoomLevel >= 10}
+              className={`p-2 rounded-lg border text-sm transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-800 hover:bg-gray-50'} disabled:opacity-50 disabled:cursor-not-allowed`}
+              title="Zoom Out (show more items)"
+            >
+              <ZoomOut size={16} />
+            </button>
+            <button
+              onClick={handleZoomIn}
+              disabled={zoomLevel <= 2}
+              className={`p-2 rounded-lg border text-sm transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-800 hover:bg-gray-50'} disabled:opacity-50 disabled:cursor-not-allowed`}
+              title="Zoom In (show fewer items)"
+            >
+              <ZoomIn size={16} />
+            </button>
+          </div>
+
+          {needsScrolling && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePrev}
+                disabled={clampedOffset === 0}
+                className={`px-3 py-2 rounded-lg border text-sm flex items-center gap-1 transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-800 hover:bg-gray-50'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                aria-label="Previous items"
+              >
+                <ChevronLeft size={16} /> Prev
+              </button>
+              <span className={`text-sm px-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                {clampedOffset + 1}-{Math.min(clampedOffset + MAX_VISIBLE_BARS, totalItems)} of {totalItems}
+              </span>
+              <button
+                onClick={handleNext}
+                disabled={clampedOffset >= maxOffset}
+                className={`px-3 py-2 rounded-lg border text-sm flex items-center gap-1 transition-all duration-200 ${isDark ? 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-800 hover:bg-gray-50'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                aria-label="Next items"
+              >
+                Next <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       <div className="overflow-hidden">
         <div
           ref={containerRef}
@@ -462,10 +715,10 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
         >
           {processedData.daily.length > 0 ? (
             <div className="w-full h-full overflow-hidden">
-              {/* FIX: Use the specific ref for each chart type */}
-              {chartType === 'bar' && <Bar ref={barChartRef} data={getChartData()} options={getChartOptions()} />}
-              {chartType === 'line' && <Line ref={lineChartRef} data={getChartData()} options={getChartOptions()} />}
-              {chartType === 'doughnut' && <Doughnut ref={doughnutChartRef} data={getChartData()} options={getChartOptions()} />}
+              {/* FIX 2: Added type assertions to options and used the correct specific ref for each chart */}
+              {chartType === 'bar' && <Bar ref={barChartRef} data={getChartData()} options={getChartOptions() as ChartOptions<'bar'>} />}
+              {chartType === 'line' && <Line ref={lineChartRef} data={getChartData()} options={getChartOptions() as ChartOptions<'line'>} />}
+              {chartType === 'doughnut' && <Doughnut ref={doughnutChartRef} data={getChartData()} options={getChartOptions() as ChartOptions<'doughnut'>} />}
             </div>
           ) : (
             <div className="flex items-center justify-center h-full">
@@ -482,7 +735,65 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
           )}
         </div>
       </div>
-      {/* ... rest of JSX ... */}
+      {(chartType === 'bar' || chartType === 'line') && needsScrolling && totalItems > 0 && (
+        <div className="mt-4 overflow-hidden">
+          <div className={`w-full h-2 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`}>
+            <div
+              className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"
+              style={{
+                width: `${((clampedOffset + Math.min(MAX_VISIBLE_BARS, totalItems)) / totalItems) * 100}%`,
+                marginLeft: `${(clampedOffset / totalItems) * 100}%`,
+              }}
+            />
+          </div>
+          <div className="flex justify-between mt-2">
+            <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              Start: {processedData.daily[0] ? new Date(processedData.daily[0].date).toLocaleDateString() : '—'}
+            </span>
+            <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              End: {processedData.daily[processedData.daily.length - 1] ? new Date(processedData.daily[processedData.daily.length - 1].date).toLocaleDateString() : '—'}
+            </span>
+          </div>
+        </div>
+      )}
+      {(chartType === 'bar' || chartType === 'line') && (
+        <div className={`mt-4 p-3 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-100'} border ${isDark ? 'border-gray-700' : 'border-gray-200'} overflow-hidden`}>
+          <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'} text-center`}>
+            💡 Tip: Use zoom controls to adjust view size ({MAX_VISIBLE_BARS} items visible){needsScrolling && `, and Prev/Next buttons to navigate. Showing ${visibleData.length} of ${totalItems}.`}
+          </p>
+        </div>
+      )}
+      {(chartType === 'bar' || chartType === 'line') && visibleData.length > 0 && (
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden">
+          <div className={`p-4 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-50'} border ${isDark ? 'border-gray-700' : 'border-gray-200'} overflow-hidden`}>
+            <h4 className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-600'} mb-2`}>Current View Total</h4>
+            <p className="text-xl font-bold">₹{visibleData.reduce((s, it) => s + it.amount, 0).toLocaleString()}</p>
+          </div>
+
+          <div className={`p-4 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-50'} border ${isDark ? 'border-gray-700' : 'border-gray-200'} overflow-hidden`}>
+            <h4 className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-600'} mb-2`}>View Average</h4>
+            <p className="text-xl font-bold">
+              ₹
+              {Math.round(
+                visibleData.reduce((s, it) => s + it.amount, 0) / Math.max(1, visibleData.length)
+              ).toLocaleString()}
+            </p>
+          </div>
+
+          <div className={`p-4 rounded-lg ${isDark ? 'bg-gray-800' : 'bg-gray-50'} border ${isDark ? 'border-gray-700' : 'border-gray-200'} overflow-hidden`}>
+            <h4 className={`text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-600'} mb-2`}>Date Range</h4>
+            <p className="text-sm font-medium">
+              {processedData.daily[0]
+                ? new Date(processedData.daily[0].date).toLocaleDateString()
+                : '—'}{' '}
+              -{' '}
+              {processedData.daily[processedData.daily.length - 1]
+                ? new Date(processedData.daily[processedData.daily.length - 1].date).toLocaleDateString()
+                : '—'}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

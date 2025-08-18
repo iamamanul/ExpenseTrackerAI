@@ -131,7 +131,8 @@ const RecordHistoryClient = ({ initialRecords, initialError }: RecordHistoryClie
     if (searchQuery.trim()) {
       const query = searchQuery.trim().toLowerCase();
       filtered = filtered.filter(record => {
-        const description = (record.description || '').toString().toLowerCase();
+        // FIX: Replaced `any` with a more specific type assertion to satisfy the linter.
+        const description = ((record as Record & { description?: string }).description || '').toString().toLowerCase();
         const category = (record.category || '').toString().toLowerCase();
         const amount = (record.amount || '').toString().toLowerCase();
         const date = (record.date || '').toString().toLowerCase();
@@ -669,7 +670,7 @@ const RecordHistoryClient = ({ initialRecords, initialError }: RecordHistoryClie
                   >
                     {paginatedRecords.map((record: Record, index: number) => (
                       <div
-                        key={record.id}
+                        key={(record as Record & { id: string }).id}
                         className="mobile-card-container transform transition-all duration-300 hover:scale-105 opacity-0 w-full"
                         style={{
                           animation: `fadeInUp 0.5s ease-out forwards`,
