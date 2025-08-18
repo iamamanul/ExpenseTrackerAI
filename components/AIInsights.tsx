@@ -707,7 +707,7 @@ Keep the advice actionable and specific to Indian financial practices.`;
           
           <div className='flex items-center gap-2'>
             {/* Current API Indicator */}
-            <div className='text-xs text-gray-500 dark:text-gray-400'>
+            <div className='hidden md:block text-xs text-gray-500 dark:text-gray-400'>
               Using: <span className='font-medium text-gray-700 dark:text-gray-300'>
                 {preferredAPI === 'groq' ? 'Groq Llama' : 'Google Gemini'}
               </span>

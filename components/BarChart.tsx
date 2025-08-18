@@ -573,7 +573,7 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
           </div>
         </div>
 
-        <div className={`p-3 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-green-50'} border ${isDark ? 'border-gray-700' : 'border-green-200'}`}>
+        <div className={`hidden md:block p-3 rounded-xl ${isDark ? 'bg-gray-800' : 'bg-green-50'} border ${isDark ? 'border-gray-700' : 'border-green-200'}`}>
           <div className="flex items-center justify-between">
             <div className="min-w-0">
               <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-green-600'}`}>Avg/Category</p>
@@ -646,7 +646,7 @@ const AdvancedChartSystem = ({ records }: { records?: Record[] }) => {
             <span>Doughnut</span>
           </button>
         </div>
-        <div className={`px-3 py-2 text-sm rounded-lg ${isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+        <div className={`hidden md:block px-3 py-2 text-sm rounded-lg ${isDark ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
           {(chartType === 'bar' || chartType === 'line')
             ? `Showing expenses by category (${processedData.categories.filter(c => c.amount > 0).length} categories with data)`
             : `Showing category distribution (${processedData.categories.filter((c) => c.amount > 0).length} with data)`}
