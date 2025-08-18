@@ -72,8 +72,11 @@ export async function getAIInsights(): Promise<InsightData[]> {
       date: expense.createdAt.toISOString(),
     }));
 
-    // Generate AI insights
-    const insights = await generateExpenseInsights(expenseData);
+    // ✅ Fix: Cast to Record<string, unknown>[] to satisfy generateExpenseInsights
+    const insights = await generateExpenseInsights(
+      expenseData as unknown as Record<string, unknown>[]
+    );
+
     return insights;
   } catch (error) {
     console.error('Error getting AI insights:', error);
