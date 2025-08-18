@@ -19,7 +19,7 @@ async function getRecords(): Promise<{
       orderBy: {
         date: 'desc', // Sort by the `date` field in descending order
       },
-      take: 10, // Limit the request to 10 records
+      take: 100, // Limit the request to 10 records
     });
 
     return { records };

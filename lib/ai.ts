@@ -1,233 +1,725 @@
-import OpenAI from 'openai';
+// lib/ai.ts - Fixed with Better Error Handling and Independent API Fallback
 
-interface RawInsight {
-  type?: string;
-  title?: string;
-  message?: string;
-  action?: string;
-  confidence?: number;
-}
-
-const openai = new OpenAI({
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
-  defaultHeaders: {
-    'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-    'X-Title': 'ExpenseTracker AI',
-  },
-});
-
-export interface ExpenseRecord {
-  id: string;
-  amount: number;
-  category: string;
-  description: string;
-  date: string;
-}
-
-export interface AIInsight {
+interface InsightData {
   id: string;
   type: 'warning' | 'info' | 'success' | 'tip';
   title: string;
   message: string;
   action?: string;
-  confidence: number;
+  confidence?: number;
 }
 
-export async function generateExpenseInsights(
-  expenses: ExpenseRecord[]
-): Promise<AIInsight[]> {
-  try {
-    // Prepare expense data for AI analysis
-    const expensesSummary = expenses.map((expense) => ({
-      amount: expense.amount,
-      category: expense.category,
-      description: expense.description,
-      date: expense.date,
-    }));
+// Define API configurations for independent services
+const API_CONFIGS = [
+  {
+    id: 'groq',
+    name: 'Groq Llama 3',
+    provider: 'Groq',
+    limits: 'Higher rate limits',
+    maxTokens: 800,
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    model: 'llama3-8b-8192'
+  },
+  {
+    id: 'gemini',
+    name: 'Google Gemini 1.5 Flash',
+    provider: 'Google',
+    limits: 'Good free tier',
+    maxTokens: 800,
+    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
+    model: 'gemini-1.5-flash-latest'
+  }
+];
 
-    const prompt = `Analyze the following expense data and provide 3-4 actionable financial insights. 
-    Return a JSON array of insights with this structure:
-    {
-      "type": "warning|info|success|tip",
-      "title": "Brief title",
-      "message": "Detailed insight message with specific numbers when possible",
-      "action": "Actionable suggestion",
-      "confidence": 0.8
-    }
+// Helper function to create AI prompt for insights
+const createInsightPrompt = (records: any[]) => {
+  return `Analyze these expense records and provide 2-3 financial insights in JSON format: ${JSON.stringify(records.slice(-10))}. 
 
-    Expense Data:
-    ${JSON.stringify(expensesSummary, null, 2)}
+Return ONLY a valid JSON array with objects containing:
+- id: string (unique identifier)
+- type: 'warning' | 'info' | 'success' | 'tip'
+- title: string (concise insight title)
+- message: string (detailed explanation)
+- action: string (optional - actionable advice)
+- confidence: number (0-1, optional)
 
-    Focus on:
-    1. Spending patterns (day of week, categories)
-    2. Budget alerts (high spending areas)
-    3. Money-saving opportunities
-    4. Positive reinforcement for good habits
-    Use Indian Rupees (₹) instead of US Dollars for all amounts.
-    If any amount is calculated, assume 1 USD = 83 INR and show it in ₹ format (e.g., ₹1,500).
+Focus on spending patterns, budget recommendations, and actionable advice. Use Indian Rupee (₹) currency only.
 
-    Return only valid JSON array, no additional text.`;
+Return only valid JSON array, no additional text.`;
+};
 
-    const completion = await openai.chat.completions.create({
-      model: 'deepseek/deepseek-chat-v3-0324:free',
+// Helper function to create AI prompt for answers
+const createAnswerPrompt = (question: string) => {
+  return `You are a helpful financial advisor. Answer this financial question: ${question}. 
+
+Requirements:
+- Use Indian Rupees (₹) for all currency amounts
+- Provide practical, actionable advice
+- Keep response under 150 words
+- Be specific and helpful
+- Focus on actionable steps
+
+Question: ${question}`;
+};
+
+// FIXED: Helper function to try Groq API with better error handling
+const tryGroqAPI = async (records: any[]): Promise<InsightData[]> => {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error('Groq API key is not configured in environment variables');
+  }
+
+  console.log('🚀 Trying Groq Llama 3 API...');
+  
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama3-8b-8192',
       messages: [
         {
           role: 'system',
-          content:
-            'You are a financial advisor AI that analyzes spending patterns and provides actionable insights. Always respond with valid JSON only.',
+          content: 'You are a financial advisor AI. Always respond with valid JSON only.'
         },
         {
-          role: 'user',
-          content: prompt,
-        },
+          role: 'user', 
+          content: createInsightPrompt(records)
+        }
       ],
       temperature: 0.7,
-      max_tokens: 1000,
-    });
+      max_tokens: 800,
+    }),
+  });
 
-    const response = completion.choices[0].message.content;
-    if (!response) {
-      throw new Error('No response from AI');
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+    throw new Error(`Groq API failed: ${response.status} - ${errorMessage}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  
+  if (!content) {
+    throw new Error('No content received from Groq API');
+  }
+
+  try {
+    const parsed = JSON.parse(content);
+    if (!Array.isArray(parsed)) {
+      throw new Error('Response is not an array');
     }
+    console.log('✅ Groq Llama 3 succeeded');
+    return parsed;
+  } catch (parseError) {
+    console.error('❌ Failed to parse JSON from Groq:', content);
+    throw new Error(`Invalid JSON response from Groq API: ${parseError.message}`);
+  }
+};
 
-    // Clean the response by removing markdown code blocks if present
-    let cleanedResponse = response.trim();
-    if (cleanedResponse.startsWith('```json')) {
-      cleanedResponse = cleanedResponse
-        .replace(/^```json\s*/, '')
-        .replace(/\s*```$/, '');
-    } else if (cleanedResponse.startsWith('```')) {
-      cleanedResponse = cleanedResponse
-        .replace(/^```\s*/, '')
-        .replace(/\s*```$/, '');
-    }
+// FIXED: Helper function to try Gemini API with better error handling
+const tryGeminiAPI = async (records: any[]): Promise<InsightData[]> => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Gemini API key is not configured in environment variables');
+  }
 
-    // Parse AI response
-    const insights = JSON.parse(cleanedResponse);
-
-    // Add IDs and ensure proper format
-    const formattedInsights = insights.map(
-      (insight: RawInsight, index: number) => ({
-        id: `ai-${Date.now()}-${index}`,
-        type: insight.type || 'info',
-        title: insight.title || 'AI Insight',
-        message: insight.message || 'Analysis complete',
-        action: insight.action,
-        confidence: insight.confidence || 0.8,
-      })
-    );
-
-    return formattedInsights;
-  } catch (error) {
-    console.error('❌ Error generating AI insights:', error);
-
-    // Fallback to mock insights if AI fails
-    return [
-      {
-        id: 'fallback-1',
-        type: 'info',
-        title: 'AI Analysis Unavailable',
-        message:
-          'Unable to generate personalized insights at this time. Please try again later.',
-        action: 'Refresh insights',
-        confidence: 0.5,
+  console.log('🚀 Trying Google Gemini API...');
+  
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{
+          text: createInsightPrompt(records)
+        }]
+      }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 800,
+        candidateCount: 1,
       },
-    ];
-  }
-}
+    }),
+  });
 
-export async function categorizeExpense(description: string): Promise<string> {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+    throw new Error(`Gemini API failed: ${response.status} - ${errorMessage}`);
+  }
+
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  
+  if (!content) {
+    throw new Error('No content received from Gemini API');
+  }
+
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'deepseek/deepseek-chat-v3-0324:free',
+    const parsed = JSON.parse(content);
+    if (!Array.isArray(parsed)) {
+      throw new Error('Response is not an array');
+    }
+    console.log('✅ Google Gemini succeeded');
+    return parsed;
+  } catch (parseError) {
+    console.error('❌ Failed to parse JSON from Gemini:', content);
+    throw new Error(`Invalid JSON response from Gemini API: ${parseError.message}`);
+  }
+};
+
+// FIXED: Helper function to try Groq for answers with better error handling
+const tryGroqAnswer = async (question: string): Promise<string> => {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error('Groq API key is not configured in environment variables');
+  }
+
+  console.log('🚀 Trying Groq for answer...');
+  
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama3-8b-8192',
       messages: [
         {
           role: 'system',
-          content:
-            'You are an expense categorization AI. Categorize expenses into one of these categories: Food, Transportation, Entertainment, Shopping, Bills, Healthcare, Other. Respond with only the category name.',
+          content: 'You are a helpful financial advisor. Be concise, practical, and use Indian Rupees (₹) for currency.'
         },
         {
           role: 'user',
-          content: `Categorize this expense: "${description}"`,
-        },
-      ],
-      temperature: 0.1,
-      max_tokens: 20,
-    });
-
-    const category = completion.choices[0].message.content?.trim();
-
-    const validCategories = [
-      'Food',
-      'Transportation',
-      'Entertainment',
-      'Shopping',
-      'Bills',
-      'Healthcare',
-      'Other',
-    ];
-
-    const finalCategory = validCategories.includes(category || '')
-      ? category!
-      : 'Other';
-    return finalCategory;
-  } catch (error) {
-    console.error('❌ Error categorizing expense:', error);
-    return 'Other';
-  }
-}
-
-export async function generateAIAnswer(
-  question: string,
-  context: ExpenseRecord[]
-): Promise<string> {
-  try {
-    const expensesSummary = context.map((expense) => ({
-      amount: expense.amount,
-      category: expense.category,
-      description: expense.description,
-      date: expense.date,
-    }));
-
-    const prompt = `Based on the following expense data, provide a detailed and actionable answer to this question: "${question}"
-
-    Expense Data:
-    ${JSON.stringify(expensesSummary, null, 2)}
-
-    Provide a comprehensive answer that:
-    1. Addresses the specific question directly
-    2. Uses concrete data from the expenses when possible
-    3. Offers actionable advice
-    4. Keeps the response concise but informative (2-3 sentences)
-    
-    Return only the answer text, no additional formatting.`;
-
-    const completion = await openai.chat.completions.create({
-      model: 'deepseek/deepseek-chat-v3-0324:free',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are a helpful financial advisor AI that provides specific, actionable answers based on expense data. Be concise but thorough.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
+          content: createAnswerPrompt(question)
+        }
       ],
       temperature: 0.7,
       max_tokens: 200,
-    });
+    }),
+  });
 
-    const response = completion.choices[0].message.content;
-    if (!response) {
-      throw new Error('No response from AI');
-    }
-
-    return response.trim();
-  } catch (error) {
-    console.error('❌ Error generating AI answer:', error);
-    return "I'm unable to provide a detailed answer at the moment. Please try refreshing the insights or check your connection.";
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+    throw new Error(`Groq Answer API failed: ${response.status} - ${errorMessage}`);
   }
+
+  const data = await response.json();
+  const answer = data.choices?.[0]?.message?.content;
+  
+  if (!answer) {
+    throw new Error('No answer received from Groq API');
+  }
+
+  console.log('✅ Groq answer succeeded');
+  return answer.trim();
+};
+
+// FIXED: Helper function to try Gemini for answers with better error handling
+const tryGeminiAnswer = async (question: string): Promise<string> => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Gemini API key is not configured in environment variables');
+  }
+
+  console.log('🚀 Trying Gemini for answer...');
+  
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{
+          text: createAnswerPrompt(question)
+        }]
+      }],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 200,
+        candidateCount: 1,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+    throw new Error(`Gemini Answer API failed: ${response.status} - ${errorMessage}`);
+  }
+
+  const data = await response.json();
+  const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  
+  if (!answer) {
+    throw new Error('No answer received from Gemini API');
+  }
+
+  console.log('✅ Gemini answer succeeded');
+  return answer.trim();
+};
+
+// MAIN FUNCTION: Generate expense insights with independent API fallback
+export async function generateExpenseInsights(records: any[]): Promise<InsightData[]> {
+  if (!records || records.length === 0) {
+    return [{
+      id: 'no-data',
+      type: 'info',
+      title: 'No Data Available',
+      message: 'Add some expense records to get AI-powered insights.',
+      action: 'Add your first expense',
+    }];
+  }
+
+  const errors: string[] = [];
+  
+  // Try Groq first (usually faster and more reliable)
+  try {
+    const insights = await tryGroqAPI(records);
+    
+    // Add confidence score and validate insights
+    const enhancedInsights = insights
+      .filter(insight => insight && insight.title && insight.message) // Filter out invalid insights
+      .map(insight => ({
+        ...insight,
+        confidence: insight.confidence || 0.9,
+        id: insight.id || `groq-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      }));
+    
+    if (enhancedInsights.length > 0) {
+      console.log('🎉 Successfully generated insights using Groq Llama 3');
+      return enhancedInsights;
+    } else {
+      throw new Error('No valid insights returned from Groq API');
+    }
+    
+  } catch (error: any) {
+    errors.push(`Groq: ${error.message}`);
+    console.log('❌ Groq API failed:', error.message);
+    
+    // Check error type for better logging
+    if (error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
+      console.log('⚠️ Rate limit hit on Groq, trying Gemini...');
+    } else if (error.message?.includes('500') || error.message?.includes('503')) {
+      console.log('🔧 Server error on Groq, trying Gemini...');
+    } else if (error.message?.includes('API key')) {
+      console.log('🔑 API key issue on Groq, trying Gemini...');
+    } else {
+      console.log('💥 Unknown error on Groq, trying Gemini...');
+    }
+  }
+  
+  // Fallback to Gemini
+  try {
+    console.log('🔄 Falling back to Google Gemini...');
+    const insights = await tryGeminiAPI(records);
+    
+    // Add confidence score and validate insights
+    const enhancedInsights = insights
+      .filter(insight => insight && insight.title && insight.message) // Filter out invalid insights
+      .map(insight => ({
+        ...insight,
+        confidence: insight.confidence || 0.85,
+        id: insight.id || `gemini-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      }));
+    
+    if (enhancedInsights.length > 0) {
+      console.log('🎉 Successfully generated insights using Google Gemini (fallback)');
+      return enhancedInsights;
+    } else {
+      throw new Error('No valid insights returned from Gemini API');
+    }
+    
+  } catch (error: any) {
+    errors.push(`Gemini: ${error.message}`);
+    console.log('❌ Gemini API also failed:', error.message);
+  }
+  
+  // If both APIs failed, throw comprehensive error with all details
+  const allErrors = errors.join(' | ');
+  console.error('💥 All AI APIs failed:', allErrors);
+  throw new Error(`All AI APIs failed: ${allErrors}`);
+}
+
+// MAIN FUNCTION: Generate answers with independent API fallback
+export async function generateInsightAnswer(question: string): Promise<string> {
+  if (!question || question.trim().length === 0) {
+    throw new Error('Question cannot be empty');
+  }
+
+  const errors: string[] = [];
+  
+  // Try Groq first for answers
+  try {
+    const answer = await tryGroqAnswer(question);
+    if (answer && answer.trim().length > 0) {
+      console.log('🎉 Successfully generated answer using Groq Llama 3');
+      return answer;
+    } else {
+      throw new Error('Empty answer received from Groq');
+    }
+    
+  } catch (error: any) {
+    errors.push(`Groq: ${error.message}`);
+    console.log('❌ Groq answer failed:', error.message);
+    
+    if (error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
+      console.log('⚠️ Rate limit on Groq answer, trying Gemini...');
+    } else if (error.message?.includes('API key')) {
+      console.log('🔑 API key issue on Groq answer, trying Gemini...');
+    } else {
+      console.log('🔄 Groq answer error, trying Gemini...');
+    }
+  }
+  
+  // Fallback to Gemini for answers
+  try {
+    console.log('🔄 Falling back to Gemini for answer...');
+    const answer = await tryGeminiAnswer(question);
+    if (answer && answer.trim().length > 0) {
+      console.log('🎉 Successfully generated answer using Gemini (fallback)');
+      return answer;
+    } else {
+      throw new Error('Empty answer received from Gemini');
+    }
+    
+  } catch (error: any) {
+    errors.push(`Gemini: ${error.message}`);
+    console.log('❌ Gemini answer also failed:', error.message);
+  }
+  
+  // If both APIs failed, throw comprehensive error
+  const allErrors = errors.join(' | ');
+  console.error('💥 All answer APIs failed:', allErrors);
+  throw new Error(`All answer APIs failed: ${allErrors}`);
+}
+
+// Export API info for debugging/UI purposes
+export const getAPIInfo = () => API_CONFIGS;
+
+// ENHANCED: Helper function to check API health with timeout and better error handling
+export async function checkAPIHealth(apiId?: string, timeoutMs: number = 10000): Promise<{ api: string; status: 'healthy' | 'rate_limited' | 'error'; error?: string }[]> {
+  const apisToCheck = apiId 
+    ? API_CONFIGS.filter(a => a.id === apiId)
+    : API_CONFIGS;
+  
+  const healthChecks = await Promise.allSettled(
+    apisToCheck.map(async (apiConfig) => {
+      const checkPromise = async () => {
+        try {
+          if (apiConfig.id === 'groq') {
+            const apiKey = process.env.GROQ_API_KEY;
+            if (!apiKey) {
+              throw new Error('API key not configured');
+            }
+
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'llama3-8b-8192',
+                messages: [{ role: 'user', content: 'Hello' }],
+                max_tokens: 10,
+              }),
+            });
+            
+            if (response.ok) {
+              return { api: apiConfig.name, status: 'healthy' as const };
+            } else if (response.status === 429) {
+              return { api: apiConfig.name, status: 'rate_limited' as const };
+            } else {
+              const errorData = await response.json().catch(() => ({}));
+              return { 
+                api: apiConfig.name, 
+                status: 'error' as const, 
+                error: errorData.error?.message || `HTTP ${response.status}`
+              };
+            }
+            
+          } else if (apiConfig.id === 'gemini') {
+            const apiKey = process.env.GEMINI_API_KEY;
+            if (!apiKey) {
+              throw new Error('API key not configured');
+            }
+
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: 'Hello' }] }],
+                generationConfig: { maxOutputTokens: 10 },
+              }),
+            });
+            
+            if (response.ok) {
+              return { api: apiConfig.name, status: 'healthy' as const };
+            } else if (response.status === 429) {
+              return { api: apiConfig.name, status: 'rate_limited' as const };
+            } else {
+              const errorData = await response.json().catch(() => ({}));
+              return { 
+                api: apiConfig.name, 
+                status: 'error' as const, 
+                error: errorData.error?.message || `HTTP ${response.status}`
+              };
+            }
+          }
+          
+          return {
+            api: apiConfig.name,
+            status: 'error' as const,
+            error: 'Unknown API type'
+          };
+          
+        } catch (error: any) {
+          return {
+            api: apiConfig.name,
+            status: error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit') 
+              ? 'rate_limited' as const 
+              : 'error' as const,
+            error: error.message
+          };
+        }
+      };
+
+      // Add timeout to health check
+      return Promise.race([
+        checkPromise(),
+        new Promise<{ api: string; status: 'error'; error: string }>((_, reject) => 
+          setTimeout(() => reject(new Error('Health check timeout')), timeoutMs)
+        )
+      ]);
+    })
+  );
+  
+  return healthChecks.map((result, index) => 
+    result.status === 'fulfilled' 
+      ? result.value 
+      : { 
+          api: apisToCheck[index].name, 
+          status: 'error' as const, 
+          error: result.reason?.message || 'Health check failed' 
+        }
+  );
+}
+
+// Add these functions to your ai.ts file
+
+// Helper function to create category suggestion prompt
+const createCategoryPrompt = (description: string) => {
+  return `Based on this expense description: "${description}"
+
+Suggest the most appropriate category from these options:
+- Food
+- Transportation  
+- Shopping
+- Entertainment
+- Bills
+- Healthcare
+- Other
+
+Return ONLY the category name, nothing else. Choose the single best match.
+
+Examples:
+- "coffee at starbucks" → Food
+- "uber ride to work" → Transportation
+- "netflix subscription" → Entertainment
+- "medicine from pharmacy" → Healthcare
+- "electricity bill payment" → Bills
+- "bought new shoes" → Shopping
+
+Description: ${description}
+Category:`;
+};
+
+// Helper function to try Groq for category suggestion
+const tryGroqCategory = async (description: string): Promise<string> => {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error('Groq API key is not configured in environment variables');
+  }
+
+  console.log('🚀 Trying Groq for category suggestion...');
+  
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama3-8b-8192',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a category classifier. Return only the category name from the given options. Be precise and concise.'
+        },
+        {
+          role: 'user',
+          content: createCategoryPrompt(description)
+        }
+      ],
+      temperature: 0.3, // Lower temperature for more consistent categorization
+      max_tokens: 50,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+    throw new Error(`Groq Category API failed: ${response.status} - ${errorMessage}`);
+  }
+
+  const data = await response.json();
+  const category = data.choices?.[0]?.message?.content?.trim();
+  
+  if (!category) {
+    throw new Error('No category received from Groq API');
+  }
+
+  // Validate that the category is one of our expected values
+  const validCategories = ['Food', 'Transportation', 'Shopping', 'Entertainment', 'Bills', 'Healthcare', 'Other'];
+  const normalizedCategory = validCategories.find(cat => 
+    cat.toLowerCase() === category.toLowerCase()
+  ) || 'Other';
+
+  console.log('✅ Groq category suggestion succeeded:', normalizedCategory);
+  return normalizedCategory;
+};
+
+// Helper function to try Gemini for category suggestion
+const tryGeminiCategory = async (description: string): Promise<string> => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Gemini API key is not configured in environment variables');
+  }
+
+  console.log('🚀 Trying Gemini for category suggestion...');
+  
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{
+          text: createCategoryPrompt(description)
+        }]
+      }],
+      generationConfig: {
+        temperature: 0.3, // Lower temperature for consistent categorization
+        maxOutputTokens: 50,
+        candidateCount: 1,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+    throw new Error(`Gemini Category API failed: ${response.status} - ${errorMessage}`);
+  }
+
+  const data = await response.json();
+  const category = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  
+  if (!category) {
+    throw new Error('No category received from Gemini API');
+  }
+
+  // Validate that the category is one of our expected values
+  const validCategories = ['Food', 'Transportation', 'Shopping', 'Entertainment', 'Bills', 'Healthcare', 'Other'];
+  const normalizedCategory = validCategories.find(cat => 
+    cat.toLowerCase() === category.toLowerCase()
+  ) || 'Other';
+
+  console.log('✅ Gemini category suggestion succeeded:', normalizedCategory);
+  return normalizedCategory;
+};
+
+// MAIN FUNCTION: Suggest expense category with API fallback
+export async function suggestExpenseCategory(description: string): Promise<{ category?: string; error?: string }> {
+  if (!description || description.trim().length === 0) {
+    return { error: 'Description cannot be empty' };
+  }
+
+  // Clean up the description
+  const cleanDescription = description.trim().toLowerCase();
+  
+  // Simple rule-based fallback for common cases (works offline)
+  const getSimpleCategory = (desc: string): string => {
+    const foodKeywords = ['coffee', 'food', 'restaurant', 'lunch', 'dinner', 'breakfast', 'pizza', 'burger', 'meal', 'snack', 'grocery', 'market'];
+    const transportKeywords = ['uber', 'taxi', 'bus', 'train', 'metro', 'fuel', 'gas', 'petrol', 'parking', 'flight', 'car'];
+    const shoppingKeywords = ['shop', 'buy', 'purchase', 'store', 'mall', 'online', 'amazon', 'flipkart', 'clothes', 'shoes'];
+    const entertainmentKeywords = ['movie', 'cinema', 'netflix', 'spotify', 'game', 'concert', 'show', 'party', 'club'];
+    const billsKeywords = ['bill', 'electricity', 'water', 'internet', 'phone', 'rent', 'emi', 'subscription', 'insurance'];
+    const healthcareKeywords = ['doctor', 'hospital', 'medicine', 'pharmacy', 'medical', 'health', 'clinic', 'dentist'];
+
+    if (foodKeywords.some(keyword => desc.includes(keyword))) return 'Food';
+    if (transportKeywords.some(keyword => desc.includes(keyword))) return 'Transportation';
+    if (shoppingKeywords.some(keyword => desc.includes(keyword))) return 'Shopping';
+    if (entertainmentKeywords.some(keyword => desc.includes(keyword))) return 'Entertainment';
+    if (billsKeywords.some(keyword => desc.includes(keyword))) return 'Bills';
+    if (healthcareKeywords.some(keyword => desc.includes(keyword))) return 'Healthcare';
+    
+    return 'Other';
+  };
+
+  const errors: string[] = [];
+  
+  // Try Groq first for category suggestion
+  try {
+    const category = await tryGroqCategory(description);
+    console.log('🎉 Successfully suggested category using Groq Llama 3:', category);
+    return { category };
+    
+  } catch (error: any) {
+    errors.push(`Groq: ${error.message}`);
+    console.log('❌ Groq category suggestion failed:', error.message);
+    
+    if (error.message?.includes('429') || error.message?.toLowerCase().includes('rate limit')) {
+      console.log('⚠️ Rate limit on Groq category, trying Gemini...');
+    } else if (error.message?.includes('API key')) {
+      console.log('🔑 API key issue on Groq category, trying Gemini...');
+    } else {
+      console.log('🔄 Groq category error, trying Gemini...');
+    }
+  }
+  
+  // Fallback to Gemini for category suggestion
+  try {
+    console.log('🔄 Falling back to Gemini for category...');
+    const category = await tryGeminiCategory(description);
+    console.log('🎉 Successfully suggested category using Gemini (fallback):', category);
+    return { category };
+    
+  } catch (error: any) {
+    errors.push(`Gemini: ${error.message}`);
+    console.log('❌ Gemini category suggestion also failed:', error.message);
+  }
+  
+  // If both AI APIs failed, use simple rule-based approach
+  console.log('🔄 Both AI APIs failed, using rule-based category suggestion...');
+  const simpleCategory = getSimpleCategory(cleanDescription);
+  console.log('✅ Rule-based category suggestion:', simpleCategory);
+  
+  return { 
+    category: simpleCategory,
+    // Don't show the AI errors to user, just use the rule-based result
+  };
 }

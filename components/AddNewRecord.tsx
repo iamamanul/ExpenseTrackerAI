@@ -5,36 +5,38 @@ import { suggestCategory } from '@/app/actions/suggestCategory';
 
 const AddRecord = () => {
   const formRef = useRef<HTMLFormElement>(null);
-  const [amount, setAmount] = useState(50); // Default value for expense amount
-  const [alertMessage, setAlertMessage] = useState<string | null>(null); // State for alert message
-  const [alertType, setAlertType] = useState<'success' | 'error' | null>(null); // State for alert type
-  const [isLoading, setIsLoading] = useState(false); // State for loading spinner
-  const [category, setCategory] = useState(''); // State for selected expense category
-  const [description, setDescription] = useState(''); // State for expense description
-  const [isCategorizingAI, setIsCategorizingAI] = useState(false); // State for AI categorization loading
+  const [amount, setAmount] = useState<number | ''>(''); // Changed: Start with empty string instead of 50
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [alertType, setAlertType] = useState<'success' | 'error' | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [category, setCategory] = useState('');
+  const [description, setDescription] = useState('');
+  const [isCategorizingAI, setIsCategorizingAI] = useState(false);
 
   const clientAction = async (formData: FormData) => {
-    setIsLoading(true); // Show spinner
-    setAlertMessage(null); // Clear previous messages
+    setIsLoading(true);
+    setAlertMessage(null);
 
-    formData.set('amount', amount.toString()); // Add the amount value to the form data
-    formData.set('category', category); // Add the selected category to the form data
+    // Convert amount to string for form data, ensuring it's not empty
+    const amountValue = amount === '' ? '0' : amount.toString();
+    formData.set('amount', amountValue);
+    formData.set('category', category);
 
-    const { error } = await addExpenseRecord(formData); // Removed `data` since it's unused
+    const { error } = await addExpenseRecord(formData);
 
     if (error) {
       setAlertMessage(`Error: ${error}`);
-      setAlertType('error'); // Set alert type to error
+      setAlertType('error');
     } else {
       setAlertMessage('Expense record added successfully!');
-      setAlertType('success'); // Set alert type to success
+      setAlertType('success');
       formRef.current?.reset();
-      setAmount(50); // Reset the amount to the default value
-      setCategory(''); // Reset the category
-      setDescription(''); // Reset the description
+      setAmount(''); // Reset to empty string
+      setCategory('');
+      setDescription('');
     }
 
-    setIsLoading(false); // Hide spinner
+    setIsLoading(false);
   };
 
   const handleAISuggestCategory = async () => {
@@ -62,6 +64,20 @@ const AddRecord = () => {
       setAlertType('error');
     } finally {
       setIsCategorizingAI(false);
+    }
+  };
+
+  // Handle amount input changes
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // If the input is empty, set state to empty string
+    if (value === '') {
+      setAmount('');
+    } else {
+      // Otherwise, parse as float
+      const numValue = parseFloat(value);
+      setAmount(isNaN(numValue) ? '' : numValue);
     }
   };
 
@@ -137,16 +153,22 @@ const AddRecord = () => {
           <div className='space-y-1.5'>
             <label
               htmlFor='date'
-              className='flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide'
+              className=' flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-gray-300 tracking-wide'
             >
               <span className='w-1.5 h-1.5 bg-green-500 rounded-full'></span>
               Expense Date
             </label>
             <input
-              type='date'
-              name='date'
-              id='date'
-              className='w-full px-3 py-2.5 bg-white/70 dark:bg-gray-800/70 border-2 border-gray-200/80 dark:border-gray-600/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:bg-white dark:focus:bg-gray-700/90 focus:border-emerald-400 dark:focus:border-emerald-400 text-gray-900 dark:text-gray-100 text-sm shadow-sm hover:shadow-md transition-all duration-200'
+              type="date"
+              name="date"
+              id="date"
+              className="w-80 sm:w-56 md:w-full px-3 py-2.5 bg-white/70 dark:bg-gray-800/70 
+             border-2 border-gray-200/80 dark:border-gray-600/80 
+             rounded-xl focus:ring-2 focus:ring-emerald-500/30 
+             focus:bg-white dark:focus:bg-gray-700/90 
+             focus:border-emerald-400 dark:focus:border-emerald-400 
+             text-gray-900 dark:text-gray-100 text-sm 
+             shadow-sm hover:shadow-md transition-all duration-200"
               required
               onFocus={(e) => e.target.showPicker()}
             />
@@ -224,7 +246,7 @@ const AddRecord = () => {
             </select>
           </div>
 
-          {/* Amount */}
+          {/* Amount - FIXED */}
           <div className='space-y-1.5'>
             <label
               htmlFor='amount'
@@ -233,7 +255,7 @@ const AddRecord = () => {
               <span className='w-1.5 h-1.5 bg-green-500 rounded-full'></span>
               Amount
               <span className='text-xs text-gray-400 dark:text-gray-500 ml-2 font-normal hidden sm:inline'>
-                Enter amount between ₹0 and ₹10,000
+                Enter amount between ₹0 and ₹1,00,000
               </span>
             </label>
             <div className='relative'>
@@ -245,10 +267,10 @@ const AddRecord = () => {
                 name='amount'
                 id='amount'
                 min='0'
-                max='10000'
+                max='100000'
                 step='0.01'
-                value={amount}
-                onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+                value={amount === '' ? '' : amount} // Show empty string when amount is empty
+                onChange={handleAmountChange} // Use custom handler
                 className='w-full pl-6 pr-3 py-2.5 bg-white/70 dark:bg-gray-800/70 border-2 border-gray-200/80 dark:border-gray-600/80 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:bg-white dark:focus:bg-gray-700/90 focus:border-emerald-400 dark:focus:border-emerald-400 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-sm font-semibold shadow-sm hover:shadow-md transition-all duration-200'
                 placeholder='0.00'
                 required
@@ -282,19 +304,17 @@ const AddRecord = () => {
       {/* Alert Message */}
       {alertMessage && (
         <div
-          className={`mt-4 p-3 rounded-xl border-l-4 backdrop-blur-sm ${
-            alertType === 'success'
+          className={`mt-4 p-3 rounded-xl border-l-4 backdrop-blur-sm ${alertType === 'success'
               ? 'bg-green-50/80 dark:bg-green-900/20 border-l-green-500 text-green-800 dark:text-green-200'
               : 'bg-red-50/80 dark:bg-red-900/20 border-l-red-500 text-red-800 dark:text-red-200'
-          }`}
+            }`}
         >
           <div className='flex items-center gap-2'>
             <div
-              className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                alertType === 'success'
+              className={`w-6 h-6 rounded-full flex items-center justify-center ${alertType === 'success'
                   ? 'bg-green-100 dark:bg-green-800'
                   : 'bg-red-100 dark:bg-red-800'
-              }`}
+                }`}
             >
               <span className='text-sm'>
                 {alertType === 'success' ? '✅' : '⚠️'}

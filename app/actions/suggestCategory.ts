@@ -1,25 +1,35 @@
 'use server';
 
-import { categorizeExpense } from '@/lib/ai';
+import { suggestExpenseCategory } from '@/lib/ai';
 
-export async function suggestCategory(
-  description: string
-): Promise<{ category: string; error?: string }> {
+export async function suggestCategory(description: string) {
   try {
-    if (!description || description.trim().length < 2) {
-      return {
-        category: 'Other',
-        error: 'Description too short for AI analysis',
-      };
+    // Validate input
+    if (!description || description.trim().length === 0) {
+      return { error: 'Please enter a description first' };
     }
 
-    const category = await categorizeExpense(description.trim());
-    return { category };
-  } catch (error) {
-    console.error('❌ Error in suggestCategory server action:', error);
-    return {
-      category: 'Other',
-      error: 'Unable to suggest category at this time',
-    };
+    if (description.trim().length > 200) {
+      return { error: 'Description is too long (max 200 characters)' };
+    }
+
+    // Call the AI function
+    const result = await suggestExpenseCategory(description.trim());
+    
+    if (result.error) {
+      console.error('Category suggestion error:', result.error);
+      return { error: 'Unable to suggest category at this time' };
+    }
+
+    if (result.category) {
+      return { category: result.category };
+    }
+
+    // Fallback if no category is returned
+    return { error: 'Unable to suggest category at this time' };
+
+  } catch (error: any) {
+    console.error('Server action error in suggestCategory:', error);
+    return { error: 'Unable to suggest category at this time' };
   }
 }
