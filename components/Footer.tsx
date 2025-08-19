@@ -30,7 +30,7 @@ const Footer = () => {
             <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4'>
               Quick Links
             </h3>
-            <div className='flex flex-col space-y-3'>
+            <div className='flex flex-col space-y-3 items-center md:items-start'>
               <Link
                 href='/'
                 className='group inline-flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-emerald-400 text-sm font-medium transition-colors duration-200'
@@ -60,7 +60,7 @@ const Footer = () => {
             <h3 className='text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4'>
               Features
             </h3>
-            <div className='space-y-3'>
+            <div className='space-y-3 flex flex-col items-center md:items-start'>
               <div className='flex items-center gap-3 text-gray-600 dark:text-gray-400 text-sm'>
                 <div className='w-5 h-5 bg-gradient-to-br from-emerald-500 to-green-500 rounded-md flex items-center justify-center shadow-sm'>
                   <span className='text-white text-xs'>🤖</span>
