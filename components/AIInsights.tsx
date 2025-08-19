@@ -34,6 +34,11 @@ const convertCurrencyInText = (text: string): string => {
   return text.replace(/\$/g, '₹');
 };
 
+// NEW: Helper function to convert **text** to bold HTML
+const formatBoldText = (text: string): string => {
+  return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+};
+
 // CHECK: API key availability
 const checkAPIKeys = () => {
   const groqKey = process.env.NEXT_PUBLIC_GROQ_API_KEY;
@@ -667,9 +672,12 @@ Keep the advice actionable and specific to Indian financial practices.`;
                             </div>
                           ) : (
                             <div>
-                              <p className='text-gray-700 dark:text-gray-300 text-xs leading-relaxed whitespace-pre-line'>
-                                {currentAnswer.answer}
-                              </p>
+                              <p 
+                                className='text-gray-700 dark:text-gray-300 text-xs leading-relaxed whitespace-pre-line'
+                                dangerouslySetInnerHTML={{ 
+                                  __html: formatBoldText(currentAnswer.answer) 
+                                }}
+                              ></p>
                               <div className='text-xs text-gray-500 dark:text-gray-400 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600'>
                                 💡 Powered by {lastUsedAPI === 'groq' ? 'Groq Llama' : 'Google Gemini'}
                               </div>

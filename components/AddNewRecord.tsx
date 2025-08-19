@@ -163,7 +163,7 @@ const AddRecord = ({ className }: AddRecordProps) => {
               type="date"
               name="date"
               id="date"
-              className="w-80 sm:w-56 md:w-full px-3 py-2.5 bg-white/70 dark:bg-gray-800/70 
+              className="w-40 sm:w-56 md:w-full px-3 py-2.5 bg-white/70 dark:bg-gray-800/70 
                border-2 border-gray-200/80 dark:border-gray-600/80 
                rounded-xl focus:ring-2 focus:ring-emerald-500/30 
                focus:bg-white dark:focus:bg-gray-700/90 
