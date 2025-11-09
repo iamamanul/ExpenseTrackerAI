@@ -1,0 +1,25 @@
+# Node modules (installed inside the container)
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Local environment files
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Do not ignore these Prisma files
+!.env
+!prisma/
+
+# Next.js build output (will be rebuilt inside container)
+.next
+out
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
