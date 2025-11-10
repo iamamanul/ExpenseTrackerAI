@@ -19,6 +19,7 @@ model User {
   email     String   @unique
   name      String?
   imageUrl String?
+  monthlyBudget Float?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   Records  Record[]

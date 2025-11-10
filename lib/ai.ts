@@ -47,12 +47,12 @@ interface HealthCheckResult {
 const API_CONFIGS: ApiConfig[] = [
   {
     id: 'groq',
-    name: 'Groq Llama 3',
+    name: 'Groq Llama 3.1',
     provider: 'Groq',
     limits: 'Higher rate limits',
     maxTokens: 800,
     endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama3-8b-8192'
+    model: 'llama-3.3-70b-versatile'
   },
   {
     id: 'gemini',
@@ -60,8 +60,8 @@ const API_CONFIGS: ApiConfig[] = [
     provider: 'Google',
     limits: 'Good free tier',
     maxTokens: 800,
-    endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
-    model: 'gemini-1.5-flash-latest'
+    endpoint: 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent',
+    model: 'gemini-1.5-flash'
   }
 ];
 
@@ -96,210 +96,304 @@ Requirements:
 Question: ${question}`;
 };
 
-// FIXED: Helper function to try Groq API with better error handling
+// FIXED: Helper function to try Groq API with better error handling and model fallback
 const tryGroqAPI = async (records: Record<string, unknown>[]): Promise<InsightData[]> => {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error('Groq API key is not configured in environment variables');
   }
 
-  console.log('🚀 Trying Groq Llama 3 API...');
-  
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'llama3-8b-8192',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a financial advisor AI. Always respond with valid JSON only.'
+  // Try different Groq models in order of preference
+  const groqModels = [
+    'llama-3.1-8b-instant',
+    'llama-3.1-70b-versatile',
+    'llama-3.3-70b-versatile',
+    'mixtral-8x7b-32768',
+    'gemma2-9b-it'
+  ];
+
+  for (const model of groqModels) {
+    try {
+      console.log(`🚀 Trying Groq ${model}...`);
+      
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
         },
-        {
-          role: 'user', 
-          content: createInsightPrompt(records)
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a financial advisor AI. Always respond with valid JSON only.'
+            },
+            {
+              role: 'user', 
+              content: createInsightPrompt(records)
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 800,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+        console.log(`❌ Groq ${model} failed: ${response.status} - ${errorMessage}`);
+        continue; // Try next model
+      }
+
+      const data: GroqResponse = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      
+      if (!content) {
+        console.log(`❌ Groq ${model} returned empty content`);
+        continue; // Try next model
+      }
+
+      try {
+        const parsed = JSON.parse(content);
+        if (!Array.isArray(parsed)) {
+          console.log(`❌ Groq ${model} response is not an array`);
+          continue; // Try next model
         }
-      ],
-      temperature: 0.7,
-      max_tokens: 800,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
-    const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
-    throw new Error(`Groq API failed: ${response.status} - ${errorMessage}`);
-  }
-
-  const data: GroqResponse = await response.json();
-  const content = data.choices?.[0]?.message?.content;
-  
-  if (!content) {
-    throw new Error('No content received from Groq API');
-  }
-
-  try {
-    const parsed = JSON.parse(content);
-    if (!Array.isArray(parsed)) {
-      throw new Error('Response is not an array');
+        console.log(`✅ Groq ${model} succeeded`);
+        return parsed;
+      } catch (parseError) {
+        console.error(`❌ Failed to parse JSON from Groq ${model}:`, content.substring(0, 200));
+        continue; // Try next model
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.log(`❌ Groq ${model} error: ${errorMessage}`);
+      continue; // Try next model
     }
-    console.log('✅ Groq Llama 3 succeeded');
-    return parsed;
-  } catch (parseError) {
-    console.error('❌ Failed to parse JSON from Groq:', content);
-    throw new Error(`Invalid JSON response from Groq API: ${(parseError as Error).message}`);
   }
+
+  // If all models failed, throw error
+  throw new Error('All Groq models failed. Please check your API key and model availability.');
 };
 
-// FIXED: Helper function to try Gemini API with better error handling
+// FIXED: Helper function to try Gemini API with better error handling and model fallback
 const tryGeminiAPI = async (records: Record<string, unknown>[]): Promise<InsightData[]> => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('Gemini API key is not configured in environment variables');
   }
 
-  console.log('🚀 Trying Google Gemini API...');
-  
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{
-          text: createInsightPrompt(records)
-        }]
-      }],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 800,
-        candidateCount: 1,
-      },
-    }),
-  });
+  // Try different Gemini model endpoints in order of preference
+  const geminiModels = [
+    'gemini-1.5-flash',
+    'gemini-pro',
+    'gemini-1.5-pro'
+  ];
 
-  if (!response.ok) {
-    const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
-    const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
-    throw new Error(`Gemini API failed: ${response.status} - ${errorMessage}`);
-  }
+  const apiVersions = ['v1', 'v1beta'];
 
-  const data: GeminiResponse = await response.json();
-  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  
-  if (!content) {
-    throw new Error('No content received from Gemini API');
-  }
+  for (const version of apiVersions) {
+    for (const model of geminiModels) {
+      try {
+        console.log(`🚀 Trying Gemini ${model} with ${version} API for insights...`);
+        
+        const response = await fetch(`https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: createInsightPrompt(records)
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 800,
+              candidateCount: 1,
+            },
+          }),
+        });
 
-  try {
-    const parsed = JSON.parse(content);
-    if (!Array.isArray(parsed)) {
-      throw new Error('Response is not an array');
+        if (!response.ok) {
+          const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
+          const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+          console.log(`❌ Gemini ${model} (${version}) failed: ${response.status} - ${errorMessage}`);
+          continue; // Try next model
+        }
+
+        const data: GeminiResponse = await response.json();
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (!content) {
+          console.log(`❌ Gemini ${model} (${version}) returned empty content`);
+          continue; // Try next model
+        }
+
+        try {
+          const parsed = JSON.parse(content);
+          if (!Array.isArray(parsed)) {
+            console.log(`❌ Gemini ${model} (${version}) response is not an array`);
+            continue; // Try next model
+          }
+          console.log(`✅ Google Gemini ${model} (${version}) succeeded`);
+          return parsed;
+        } catch (parseError) {
+          console.error(`❌ Failed to parse JSON from Gemini ${model} (${version}):`, content.substring(0, 200));
+          continue; // Try next model
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.log(`❌ Gemini ${model} (${version}) error: ${errorMessage}`);
+        continue; // Try next model
+      }
     }
-    console.log('✅ Google Gemini succeeded');
-    return parsed;
-  } catch (parseError) {
-    console.error('❌ Failed to parse JSON from Gemini:', content);
-    throw new Error(`Invalid JSON response from Gemini API: ${(parseError as Error).message}`);
   }
+
+  // If all models failed, throw error
+  throw new Error('All Gemini models failed. Please check your API key and model availability.');
 };
 
-// FIXED: Helper function to try Groq for answers with better error handling
+// FIXED: Helper function to try Groq for answers with better error handling and model fallback
 const tryGroqAnswer = async (question: string): Promise<string> => {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error('Groq API key is not configured in environment variables');
   }
 
-  console.log('🚀 Trying Groq for answer...');
-  
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'llama3-8b-8192',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a helpful financial advisor. Be concise, practical, and use Indian Rupees (₹) for currency.'
+  // Try different Groq models in order of preference
+  const groqModels = [
+    'llama-3.1-8b-instant',
+    'llama-3.1-70b-versatile',
+    'llama-3.3-70b-versatile',
+    'mixtral-8x7b-32768',
+    'gemma2-9b-it'
+  ];
+
+  for (const model of groqModels) {
+    try {
+      console.log(`🚀 Trying Groq ${model} for answer...`);
+      
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
         },
-        {
-          role: 'user',
-          content: createAnswerPrompt(question)
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 200,
-    }),
-  });
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful financial advisor. Be concise, practical, and use Indian Rupees (₹) for currency.'
+            },
+            {
+              role: 'user',
+              content: createAnswerPrompt(question)
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 200,
+        }),
+      });
 
-  if (!response.ok) {
-    const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
-    const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
-    throw new Error(`Groq Answer API failed: ${response.status} - ${errorMessage}`);
+      if (!response.ok) {
+        const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+        console.log(`❌ Groq ${model} answer failed: ${response.status} - ${errorMessage}`);
+        continue; // Try next model
+      }
+
+      const data: GroqResponse = await response.json();
+      const answer = data.choices?.[0]?.message?.content;
+      
+      if (!answer) {
+        console.log(`❌ Groq ${model} returned empty answer`);
+        continue; // Try next model
+      }
+
+      console.log(`✅ Groq ${model} answer succeeded`);
+      return answer.trim();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.log(`❌ Groq ${model} answer error: ${errorMessage}`);
+      continue; // Try next model
+    }
   }
 
-  const data: GroqResponse = await response.json();
-  const answer = data.choices?.[0]?.message?.content;
-  
-  if (!answer) {
-    throw new Error('No answer received from Groq API');
-  }
-
-  console.log('✅ Groq answer succeeded');
-  return answer.trim();
+  // If all models failed, throw error
+  throw new Error('All Groq models failed. Please check your API key and model availability.');
 };
 
-// FIXED: Helper function to try Gemini for answers with better error handling
+// FIXED: Helper function to try Gemini for answers with better error handling and model fallback
 const tryGeminiAnswer = async (question: string): Promise<string> => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('Gemini API key is not configured in environment variables');
   }
 
-  console.log('🚀 Trying Gemini for answer...');
-  
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{
-          text: createAnswerPrompt(question)
-        }]
-      }],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 200,
-        candidateCount: 1,
-      },
-    }),
-  });
+  // Try different Gemini model endpoints in order of preference
+  const geminiModels = [
+    'gemini-1.5-flash',
+    'gemini-pro',
+    'gemini-1.5-pro'
+  ];
 
-  if (!response.ok) {
-    const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
-    const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
-    throw new Error(`Gemini Answer API failed: ${response.status} - ${errorMessage}`);
+  const apiVersions = ['v1', 'v1beta'];
+
+  for (const version of apiVersions) {
+    for (const model of geminiModels) {
+      try {
+        console.log(`🚀 Trying Gemini ${model} with ${version} API...`);
+        
+        const response = await fetch(`https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: createAnswerPrompt(question)
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 200,
+              candidateCount: 1,
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
+          const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+          console.log(`❌ Gemini ${model} (${version}) failed: ${response.status} - ${errorMessage}`);
+          continue; // Try next model
+        }
+
+        const data: GeminiResponse = await response.json();
+        const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (!answer) {
+          console.log(`❌ Gemini ${model} (${version}) returned empty answer`);
+          continue; // Try next model
+        }
+
+        console.log(`✅ Gemini ${model} (${version}) answer succeeded`);
+        return answer.trim();
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.log(`❌ Gemini ${model} (${version}) error: ${errorMessage}`);
+        continue; // Try next model
+      }
+    }
   }
 
-  const data: GeminiResponse = await response.json();
-  const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  
-  if (!answer) {
-    throw new Error('No answer received from Gemini API');
-  }
-
-  console.log('✅ Gemini answer succeeded');
-  return answer.trim();
+  // If all models failed, throw error
+  throw new Error('All Gemini models failed. Please check your API key and model availability.');
 };
 
 // MAIN FUNCTION: Generate expense insights with independent API fallback
@@ -467,7 +561,7 @@ export async function checkAPIHealth(apiId?: string, timeoutMs: number = 10000):
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                model: 'llama3-8b-8192',
+                model: 'llama-3.1-8b-instant',
                 messages: [{ role: 'user', content: 'Hello' }],
                 max_tokens: 10,
               }),
@@ -492,7 +586,7 @@ export async function checkAPIHealth(apiId?: string, timeoutMs: number = 10000):
               throw new Error('API key not configured');
             }
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -583,59 +677,76 @@ Description: ${description}
 Category:`;
 };
 
-// Helper function to try Groq for category suggestion
+// Helper function to try Groq for category suggestion with model fallback
 const tryGroqCategory = async (description: string): Promise<string> => {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error('Groq API key is not configured in environment variables');
   }
 
-  console.log('🚀 Trying Groq for category suggestion...');
-  
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'llama3-8b-8192',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a category classifier. Return only the category name from the given options. Be precise and concise.'
+  // Try different Groq models
+  const groqModels = [
+    'llama-3.1-8b-instant',
+    'llama-3.1-70b-versatile',
+    'llama-3.3-70b-versatile',
+    'mixtral-8x7b-32768'
+  ];
+
+  for (const model of groqModels) {
+    try {
+      console.log(`🚀 Trying Groq ${model} for category suggestion...`);
+      
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
         },
-        {
-          role: 'user',
-          content: createCategoryPrompt(description)
-        }
-      ],
-      temperature: 0.3, // Lower temperature for more consistent categorization
-      max_tokens: 50,
-    }),
-  });
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a category classifier. Return only the category name from the given options. Be precise and concise.'
+            },
+            {
+              role: 'user',
+              content: createCategoryPrompt(description)
+            }
+          ],
+          temperature: 0.3, // Lower temperature for more consistent categorization
+          max_tokens: 50,
+        }),
+      });
 
-  if (!response.ok) {
-    const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
-    const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
-    throw new Error(`Groq Category API failed: ${response.status} - ${errorMessage}`);
+      if (!response.ok) {
+        console.log(`❌ Groq ${model} category failed: ${response.status}`);
+        continue; // Try next model
+      }
+
+      const data: GroqResponse = await response.json();
+      const category = data.choices?.[0]?.message?.content?.trim();
+      
+      if (!category) {
+        console.log(`❌ Groq ${model} returned empty category`);
+        continue; // Try next model
+      }
+
+      // Validate that the category is one of our expected values
+      const validCategories = ['Food', 'Transportation', 'Shopping', 'Entertainment', 'Bills', 'Healthcare', 'Other'];
+      const normalizedCategory = validCategories.find(cat => 
+        cat.toLowerCase() === category.toLowerCase()
+      ) || 'Other';
+
+      console.log(`✅ Groq ${model} category suggestion succeeded:`, normalizedCategory);
+      return normalizedCategory;
+    } catch (error) {
+      console.log(`❌ Groq ${model} category error:`, error instanceof Error ? error.message : 'Unknown error');
+      continue; // Try next model
+    }
   }
 
-  const data: GroqResponse = await response.json();
-  const category = data.choices?.[0]?.message?.content?.trim();
-  
-  if (!category) {
-    throw new Error('No category received from Groq API');
-  }
-
-  // Validate that the category is one of our expected values
-  const validCategories = ['Food', 'Transportation', 'Shopping', 'Entertainment', 'Bills', 'Healthcare', 'Other'];
-  const normalizedCategory = validCategories.find(cat => 
-    cat.toLowerCase() === category.toLowerCase()
-  ) || 'Other';
-
-  console.log('✅ Groq category suggestion succeeded:', normalizedCategory);
-  return normalizedCategory;
+  throw new Error('All Groq models failed for category suggestion.');
 };
 
 // Helper function to try Gemini for category suggestion
@@ -645,48 +756,63 @@ const tryGeminiCategory = async (description: string): Promise<string> => {
     throw new Error('Gemini API key is not configured in environment variables');
   }
 
-  console.log('🚀 Trying Gemini for category suggestion...');
-  
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{
-          text: createCategoryPrompt(description)
-        }]
-      }],
-      generationConfig: {
-        temperature: 0.3, // Lower temperature for consistent categorization
-        maxOutputTokens: 50,
-        candidateCount: 1,
-      },
-    }),
-  });
+  // Try different Gemini model endpoints
+  const geminiModels = ['gemini-1.5-flash', 'gemini-pro'];
+  const apiVersions = ['v1', 'v1beta'];
 
-  if (!response.ok) {
-    const errorData: { error?: { message?: string } } = await response.json().catch(() => ({}));
-    const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
-    throw new Error(`Gemini Category API failed: ${response.status} - ${errorMessage}`);
+  for (const version of apiVersions) {
+    for (const model of geminiModels) {
+      try {
+        console.log(`🚀 Trying Gemini ${model} (${version}) for category suggestion...`);
+        
+        const response = await fetch(`https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: createCategoryPrompt(description)
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.3, // Lower temperature for consistent categorization
+              maxOutputTokens: 50,
+              candidateCount: 1,
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          console.log(`❌ Gemini ${model} (${version}) category failed: ${response.status}`);
+          continue; // Try next model
+        }
+
+        const data: GeminiResponse = await response.json();
+        const category = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        
+        if (!category) {
+          console.log(`❌ Gemini ${model} (${version}) returned empty category`);
+          continue; // Try next model
+        }
+
+        // Validate that the category is one of our expected values
+        const validCategories = ['Food', 'Transportation', 'Shopping', 'Entertainment', 'Bills', 'Healthcare', 'Other'];
+        const normalizedCategory = validCategories.find(cat => 
+          cat.toLowerCase() === category.toLowerCase()
+        ) || 'Other';
+
+        console.log(`✅ Gemini ${model} (${version}) category suggestion succeeded:`, normalizedCategory);
+        return normalizedCategory;
+      } catch (error) {
+        console.log(`❌ Gemini ${model} (${version}) category error:`, error instanceof Error ? error.message : 'Unknown error');
+        continue; // Try next model
+      }
+    }
   }
 
-  const data: GeminiResponse = await response.json();
-  const category = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  
-  if (!category) {
-    throw new Error('No category received from Gemini API');
-  }
-
-  // Validate that the category is one of our expected values
-  const validCategories = ['Food', 'Transportation', 'Shopping', 'Entertainment', 'Bills', 'Healthcare', 'Other'];
-  const normalizedCategory = validCategories.find(cat => 
-    cat.toLowerCase() === category.toLowerCase()
-  ) || 'Other';
-
-  console.log('✅ Gemini category suggestion succeeded:', normalizedCategory);
-  return normalizedCategory;
+  throw new Error('All Gemini models failed for category suggestion.');
 };
 
 // MAIN FUNCTION: Suggest expense category with API fallback

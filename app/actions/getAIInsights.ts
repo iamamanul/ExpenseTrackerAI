@@ -22,6 +22,17 @@ export async function getAIInsights(): Promise<InsightData[]> {
       throw new Error('User not authenticated');
     }
 
+    // Check environment variables for debugging
+    const hasGroqKey = !!process.env.GROQ_API_KEY;
+    const hasGeminiKey = !!process.env.GEMINI_API_KEY;
+    
+    console.log('🔍 API Key Status in getAIInsights:', {
+      hasGroqKey,
+      hasGeminiKey,
+      groqKeyLength: process.env.GROQ_API_KEY?.length || 0,
+      geminiKeyLength: process.env.GEMINI_API_KEY?.length || 0,
+    });
+
     // Get user's recent expenses (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -39,8 +50,11 @@ export async function getAIInsights(): Promise<InsightData[]> {
       take: 50, // Limit to recent 50 expenses for analysis
     });
 
+    console.log(`📊 Found ${expenses.length} expenses for analysis`);
+
     if (expenses.length === 0) {
       // Return default insights for new users
+      console.log('👋 No expenses found, returning welcome insights');
       return [
         {
           id: 'welcome-1',
@@ -78,14 +92,37 @@ export async function getAIInsights(): Promise<InsightData[]> {
       date: expense.createdAt.toISOString(),
     }));
 
+    console.log('🚀 Calling generateExpenseInsights with', expenseData.length, 'expenses');
+    
     // ✅ Fix: Cast to Record<string, unknown>[] to satisfy generateExpenseInsights
     const insights = await generateExpenseInsights(
       expenseData as unknown as Record<string, unknown>[]
     );
 
+    console.log('✅ Generated', insights.length, 'insights');
     return insights;
   } catch (error) {
-    console.error('Error getting AI insights:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('❌ Error getting AI insights:', error);
+    console.error('Error details:', {
+      message: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
+    // Check if it's an API key issue
+    if (errorMessage.includes('API key') || errorMessage.includes('not configured')) {
+      return [
+        {
+          id: 'error-api-key',
+          type: 'warning',
+          title: 'API Configuration Required',
+          message:
+            `Unable to generate AI insights: ${errorMessage}. Please set GROQ_API_KEY or GEMINI_API_KEY in your .env.local file.`,
+          action: 'Check environment variables',
+          confidence: 0.5,
+        },
+      ];
+    }
 
     // Return fallback insights
     return [
@@ -94,7 +131,7 @@ export async function getAIInsights(): Promise<InsightData[]> {
         type: 'warning',
         title: 'Insights Temporarily Unavailable',
         message:
-          "We're having trouble analyzing your expenses right now. Please try again in a few minutes.",
+          `We're having trouble analyzing your expenses right now: ${errorMessage}. Please try again in a few minutes.`,
         action: 'Retry analysis',
         confidence: 0.5,
       },

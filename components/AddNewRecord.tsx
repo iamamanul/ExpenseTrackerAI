@@ -1,7 +1,8 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import addExpenseRecord from '@/app/actions/addExpenseRecord';
 import { suggestCategory } from '@/app/actions/suggestCategory';
+import { updateMonthlyBudget, getMonthlyBudget } from '@/app/actions/updateBudget';
 
 // 1. Define an interface for the component's props
 interface AddRecordProps {
@@ -18,6 +19,9 @@ const AddRecord = ({ className }: AddRecordProps) => {
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [isCategorizingAI, setIsCategorizingAI] = useState(false);
+  const [monthlyBudget, setMonthlyBudget] = useState<number | ''>('');
+  const [isBudgetLoading, setIsBudgetLoading] = useState(false);
+  const [showBudgetSection, setShowBudgetSection] = useState(false);
 
   const clientAction = async (formData: FormData) => {
     setIsLoading(true);
@@ -81,6 +85,42 @@ const AddRecord = ({ className }: AddRecordProps) => {
       const numValue = parseFloat(value);
       setAmount(isNaN(numValue) ? '' : numValue);
     }
+  };
+
+  // Load current budget
+  useEffect(() => {
+    const loadBudget = async () => {
+      const result = await getMonthlyBudget();
+      if (result.budget) {
+        setMonthlyBudget(result.budget);
+      }
+    };
+    loadBudget();
+  }, []);
+
+  // Handle budget update
+  const handleBudgetUpdate = async () => {
+    if (monthlyBudget === '' || monthlyBudget <= 0) {
+      setAlertMessage('Please enter a valid budget amount');
+      setAlertType('error');
+      return;
+    }
+
+    setIsBudgetLoading(true);
+    setAlertMessage(null);
+
+    const result = await updateMonthlyBudget(Number(monthlyBudget));
+    
+    if (result.error) {
+      setAlertMessage(`Error: ${result.error}`);
+      setAlertType('error');
+    } else {
+      setAlertMessage('Monthly budget updated successfully!');
+      setAlertType('success');
+      setShowBudgetSection(false);
+    }
+
+    setIsBudgetLoading(false);
   };
 
   return (
@@ -294,6 +334,64 @@ const AddRecord = ({ className }: AddRecordProps) => {
           </div>
         </button>
       </form>
+
+      {/* Monthly Budget Section */}
+      <div className='mt-6 pt-6 border-t border-gray-200 dark:border-gray-700'>
+        <button
+          onClick={() => setShowBudgetSection(!showBudgetSection)}
+          className='w-full flex items-center justify-between p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors'
+        >
+          <div className='flex items-center gap-2'>
+            <span className='text-lg'>💰</span>
+            <span className='font-medium text-gray-900 dark:text-gray-100 text-sm'>
+              {monthlyBudget ? `Monthly Budget: ₹${Number(monthlyBudget).toFixed(2)}` : 'Set Monthly Budget'}
+            </span>
+          </div>
+          <span className='text-gray-500 dark:text-gray-400'>
+            {showBudgetSection ? '▲' : '▼'}
+          </span>
+        </button>
+
+        {showBudgetSection && (
+          <div className='mt-4 p-4 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/10 dark:to-indigo-900/10 rounded-xl border border-blue-100/50 dark:border-blue-800/50'>
+            <label
+              htmlFor='monthlyBudget'
+              className='block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2'
+            >
+              Monthly Budget (₹)
+            </label>
+            <div className='flex gap-2'>
+              <input
+                type='number'
+                id='monthlyBudget'
+                min='0'
+                step='0.01'
+                value={monthlyBudget === '' ? '' : monthlyBudget}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setMonthlyBudget(value === '' ? '' : parseFloat(value) || '');
+                }}
+                className='flex-1 px-3 py-2 bg-white/70 dark:bg-gray-800/70 border-2 border-gray-200/80 dark:border-gray-600/80 rounded-xl focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 text-gray-900 dark:text-gray-100 text-sm'
+                placeholder='Enter monthly budget'
+              />
+              <button
+                onClick={handleBudgetUpdate}
+                disabled={isBudgetLoading || monthlyBudget === ''}
+                className='px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-300 disabled:to-gray-300 text-white rounded-xl font-medium text-sm shadow-lg hover:shadow-xl disabled:shadow-none transition-all duration-200'
+              >
+                {isBudgetLoading ? (
+                  <div className='w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin'></div>
+                ) : (
+                  'Save'
+                )}
+              </button>
+            </div>
+            <p className='text-xs text-gray-500 dark:text-gray-400 mt-2'>
+              Set your monthly budget to get personalized AI insights and spending alerts.
+            </p>
+          </div>
+        )}
+      </div>
       {alertMessage && (
         <div
           className={`mt-4 p-3 rounded-xl border-l-4 backdrop-blur-sm ${alertType === 'success'
