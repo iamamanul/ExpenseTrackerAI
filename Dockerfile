@@ -1,43 +1,45 @@
-# -------- BUILDER --------
+# 1️⃣ Use official Node.js LTS image
 FROM node:20-alpine AS builder
+
+# 2️⃣ Set working directory inside the container
 WORKDIR /app
 
-# Install build tools required by Prisma native bindings
-RUN apk add --no-cache python3 make g++ 
-
-COPY package*.json ./
+# 3️⃣ Copy package files and install dependencies
+COPY package.json package-lock.json ./
 RUN npm ci
-COPY . .
-# ----- Build args (unchanged) -----
-ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-ARG CLERK_SECRET_KEY
-ARG DATABASE_URL
-ARG GROQ_API_KEY
-ARG GEMINI_API_KEY
-ARG NEXT_PUBLIC_GEMINI_API_KEY
-ARG NEXT_PUBLIC_APP_URL
-ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-ENV CLERK_SECRET_KEY=$CLERK_SECRET_KEY
-ENV DATABASE_URL=$DATABASE_URL
-ENV GROQ_API_KEY=$GROQ_API_KEY
-ENV GEMINI_API_KEY=$GEMINI_API_KEY
-ENV NEXT_PUBLIC_GEMINI_API_KEY=$NEXT_PUBLIC_GEMINI_API_KEY
-ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
 
+# 4️⃣ Copy the rest of the app
+COPY . .
+
+# Generate Prisma Client
 RUN npx prisma generate
+
+# 5️⃣ Build Next.js app
 RUN npm run build
 
-# -------- RUNTIME --------
+# 6️⃣ Prepare production image
 FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Copy necessary files from builder
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/package-lock.json ./package-lock.json
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/.env ./.env
+COPY --from=builder /app/node_modules ./node_modules
 
+# Generate Prisma Client in production
+RUN npx prisma generate
+
+# Expose default Next.js port
 EXPOSE 3000
 
+# Set the command to run the app
+CMD ["npm", "run", "start"]
+
+# Run Next.js production server
 CMD ["npm", "start"]
