@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: expense-app
+  labels:
+    app: expense
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: expense
+  template:
+    metadata:
+      labels:
+        app: expense
+    spec:
+      containers:
+        - name: expense
+          image: iamamanul/expense-tracker-ai:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: expense-secret
+                  key: DATABASE_URL
+
+            - name: CLERK_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: expense-secret
+                  key: CLERK_SECRET_KEY
+
+            - name: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: expense-secret
+                  key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+            
+            - name: NEXT_PUBLIC_APP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: expense-secret
+                  key: NEXT_PUBLIC_APP_URL
+
+            - name: GROQ_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: expense-secret
+                  key: GROQ_API_KEY
+
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: expense-secret
+                  key: GEMINI_API_KEY
+
+            - name: NEXT_PUBLIC_GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: expense-secret
+                  key: NEXT_PUBLIC_GEMINI_API_KEY

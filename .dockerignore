@@ -23,3 +23,12 @@ Thumbs.db
 
 # Logs and temporary files
 *.log
+
+
+node_modules
+.git
+.gitignore
+Dockerfile
+kubernetes
+.env
+.next/cache
