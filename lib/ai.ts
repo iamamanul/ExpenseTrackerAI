@@ -162,7 +162,7 @@ const tryGroqAPI = async (records: Record<string, unknown>[]): Promise<InsightDa
         }
         console.log(`✅ Groq ${model} succeeded`);
         return parsed;
-      } catch (parseError) {
+      } catch {
         console.error(`❌ Failed to parse JSON from Groq ${model}:`, content.substring(0, 200));
         continue; // Try next model
       }
@@ -240,7 +240,7 @@ const tryGeminiAPI = async (records: Record<string, unknown>[]): Promise<Insight
           }
           console.log(`✅ Google Gemini ${model} (${version}) succeeded`);
           return parsed;
-        } catch (parseError) {
+        } catch {
           console.error(`❌ Failed to parse JSON from Gemini ${model} (${version}):`, content.substring(0, 200));
           continue; // Try next model
         }

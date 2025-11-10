@@ -1,11 +1,11 @@
 'use server';
 import { db } from '@/lib/db';
 import { auth } from '@clerk/nextjs/server';
-import { revalidatePath } from 'next/cache';
 
 async function deleteRecord(recordId: string): Promise<{
   message?: string;
   error?: string;
+  success?: boolean;
 }> {
   const { userId } = await auth();
 
@@ -21,12 +21,11 @@ async function deleteRecord(recordId: string): Promise<{
       },
     });
 
-    revalidatePath('/');
-
-    return { message: 'Record deleted' };
+    // Return success immediately without revalidatePath for faster UX
+    return { message: 'Record deleted', success: true };
   } catch (error) {
-    console.error('Error deleting record:', error); // Log the error
-    return { error: 'Database error' };
+    console.error('Error deleting record:', error);
+    return { error: 'Failed to delete record', success: false };
   }
 }
 

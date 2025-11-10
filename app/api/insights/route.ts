@@ -25,15 +25,61 @@ async function getCurrentMonthSpending(userId: string): Promise<number> {
 /**
  * GET /api/insights - Get AI insights for user's expenses
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Check authentication
-    const user = await checkUser();
+    let user;
+    try {
+      user = await checkUser();
+    } catch (authError) {
+      console.error('Authentication error:', authError);
+      // Return sample insights when auth fails
+      return NextResponse.json({
+        insights: [
+          {
+            id: 'welcome-1',
+            type: 'tip' as const,
+            title: 'Welcome to AI Insights',
+            message: 'Sign in to get personalized financial insights based on your expenses.',
+            action: 'Sign In',
+            confidence: 0.9,
+          },
+          {
+            id: 'setup-1',
+            type: 'info' as const,
+            title: 'Set Your Budget',
+            message: 'Create a monthly budget to get better financial recommendations.',
+            action: 'Learn More',
+            confidence: 0.8,
+          }
+        ],
+        budget: null,
+      });
+    }
+    
     if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      // Return sample insights for unauthenticated users
+      return NextResponse.json({
+        insights: [
+          {
+            id: 'welcome-2',
+            type: 'tip' as const,
+            title: 'Track Your Expenses',
+            message: 'Start adding your expenses to get AI-powered financial insights.',
+            action: 'Add Expense',
+            confidence: 0.9,
+          },
+          {
+            id: 'setup-2',
+            type: 'info' as const,
+            title: 'AI-Powered Analysis',
+            message: 'Our AI will help you understand your spending patterns.',
+            action: 'Learn More',
+            confidence: 0.8,
+          }
+        ],
+        budget: null,
+      });
     }
 
     // Check API keys

@@ -22,12 +22,6 @@ interface Insight {
   amount?: number;
 }
 
-interface AIResponse {
-  insights: Insight[];
-  summary?: string;
-  recommendations?: string[];
-}
-
 // Groq Models to try (in order of preference)
 const GROQ_MODELS = [
   'llama-3.1-8b-instant',
@@ -375,15 +369,15 @@ function parseInsights(response: string): Insight[] {
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       if (Array.isArray(parsed)) {
-        return parsed.map((insight: any) => ({
-          id: insight.id || `insight-${Date.now()}-${Math.random()}`,
-          type: insight.type || 'info',
-          title: insight.title || 'Insight',
-          message: insight.message || '',
-          action: insight.action,
+        return parsed.map((insight: Record<string, unknown>) => ({
+          id: String(insight.id || `insight-${Date.now()}-${Math.random()}`),
+          type: (insight.type as 'success' | 'warning' | 'info' | 'tip') || 'info',
+          title: String(insight.title || 'Insight'),
+          message: String(insight.message || ''),
+          action: insight.action as string | undefined,
           confidence: typeof insight.confidence === 'number' ? insight.confidence : 0.8,
-          category: insight.category,
-          amount: insight.amount,
+          category: insight.category as string | undefined,
+          amount: insight.amount as number | undefined,
         }));
       }
     }

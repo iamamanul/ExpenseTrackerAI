@@ -49,7 +49,6 @@ export async function generateInsightAnswer(question: string): Promise<string> {
 
   } catch (error) {
     // Handle any errors that occur
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
     console.error('❌ Error generating insight answer:', error);
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     

@@ -23,14 +23,43 @@ const getCategoryEmoji = (category: string) => {
   }
 };
 
-const RecordItem = ({ record }: { record: Record }) => {
+interface RecordItemProps {
+  record: Record;
+  onDelete?: (recordId: string) => void;
+}
+
+const RecordItem = ({ record, onDelete }: RecordItemProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
 
   const handleDeleteRecord = async (recordId: string) => {
-    setIsLoading(true); // Show loading spinner
-    await deleteRecord(recordId); // Perform delete operation
-    setIsLoading(false); // Hide loading spinner
+    setIsLoading(true);
+    setIsDeleted(true); // Optimistic update - remove from UI immediately
+    
+    try {
+      const result = await deleteRecord(recordId);
+      if (result.success) {
+        // Call parent callback to update the list
+        onDelete?.(recordId);
+      } else {
+        // Restore the item if deletion failed
+        setIsDeleted(false);
+        alert('Failed to delete record. Please try again.');
+      }
+    } catch (error) {
+      // Restore the item if there was an error
+      setIsDeleted(false);
+      console.error('Error deleting record:', error);
+      alert('Error deleting record. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  // Hide the item if it's been deleted
+  if (isDeleted) {
+    return null;
+  }
 
   // Determine border color based on expense amount
   const getBorderColor = (amount: number) => {

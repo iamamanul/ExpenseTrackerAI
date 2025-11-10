@@ -120,7 +120,7 @@ Keep the advice actionable, specific to Indian financial practices, and consider
         }
       }));
     }
-  }, [aiAnswer, expandedInsight]);
+  }, [aiAnswer, expandedInsight, budget]);
 
   useEffect(() => {
     loadInsights();
@@ -170,8 +170,14 @@ Keep the advice actionable, specific to Indian financial practices, and consider
   };
 
   // Format currency
-  const formatCurrency = (amount: number) => {
-    return `₹${amount.toFixed(2)}`;
+  const formatCurrency = (amount: number | string | undefined | null) => {
+    let numAmount = 0;
+    if (typeof amount === 'number') {
+      numAmount = amount;
+    } else if (typeof amount === 'string') {
+      numAmount = parseFloat(amount) || 0;
+    }
+    return `₹${numAmount.toFixed(2)}`;
   };
 
   // Format last updated
@@ -250,6 +256,11 @@ Keep the advice actionable, specific to Indian financial practices, and consider
     formatted = formatted.replace(/[ \t]+/g, ' ');
     
     return formatted.trim();
+  };
+
+  // Convert **text** to <strong>text</strong> for HTML rendering
+  const formatBoldText = (text: string): string => {
+    return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   };
 
   if (isLoading) {
@@ -457,10 +468,11 @@ Keep the advice actionable, specific to Indian financial practices, and consider
                           <span>AI Financial Advice</span>
                           <span className='text-xs font-normal text-gray-500 dark:text-gray-400'>✨ Personalized</span>
                         </h5>
-                        <div className='prose prose-sm max-w-none'>
-                          <p className='text-gray-700 dark:text-gray-300 text-sm leading-relaxed whitespace-pre-line'>
-                            {formatAnswer(answerData.answer)}
-                          </p>
+                        <div className='h-64 overflow-y-auto pr-3 prose prose-sm max-w-none custom-scrollbar'>
+                          <div 
+                            className='text-gray-700 dark:text-gray-300 text-sm leading-relaxed whitespace-pre-line'
+                            dangerouslySetInnerHTML={{ __html: formatBoldText(formatAnswer(answerData.answer)) }}
+                          />
                         </div>
                       </div>
                     </div>

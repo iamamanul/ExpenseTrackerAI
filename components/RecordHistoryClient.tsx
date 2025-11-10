@@ -78,6 +78,13 @@ const RecordHistoryClient = ({ initialRecords, initialError }: RecordHistoryClie
     };
   }, []);
 
+  // Handle record deletion - remove from state immediately
+  const handleRecordDelete = (recordId: string) => {
+    setRecords(prevRecords => prevRecords.filter(r => r.id !== recordId));
+    // Reset to first page if current page becomes empty
+    setCurrentPage(1);
+  };
+
   // Filter and sort records
   const filteredAndSortedRecords = useMemo(() => {
     let filtered = [...records];
@@ -671,7 +678,7 @@ const RecordHistoryClient = ({ initialRecords, initialError }: RecordHistoryClie
                           position: 'relative'
                         }}
                       >
-                        <RecordItem record={record} />
+                        <RecordItem record={record} onDelete={handleRecordDelete} />
                       </div>
                     ))}
                   </div>
