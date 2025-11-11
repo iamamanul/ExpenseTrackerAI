@@ -1,45 +1,38 @@
-# 1️⃣ Use official Node.js LTS image
+# ---- BUILD ----
 FROM node:20-alpine AS builder
-
-# 2️⃣ Set working directory inside the container
 WORKDIR /app
 
-# 3️⃣ Copy package files and install dependencies
-COPY package.json package-lock.json ./
+COPY package*.json ./
 RUN npm ci
 
-# 4️⃣ Copy the rest of the app
 COPY . .
 
-# Generate Prisma Client
-RUN npx prisma generate
+# Accept both Clerk vars (required for build)
+ARG CLERK_PUBLISHABLE_KEY
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 
-# 5️⃣ Build Next.js app
+ENV CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
+RUN npx prisma generate
 RUN npm run build
 
-# 6️⃣ Prepare production image
-FROM node:20-alpine AS runner
+# ---- RUN ----
+FROM node:20-alpine
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV PORT=3000
 
-# Copy necessary files from builder
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/package-lock.json ./package-lock.json
+COPY package*.json ./
+RUN npm ci --omit=dev
+
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/.env ./.env
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
-# Generate Prisma Client in production
-RUN npx prisma generate
-
-# Expose default Next.js port
 EXPOSE 3000
-
-# Set the command to run the app
-CMD ["npm", "run", "start"]
-
-# Run Next.js production server
 CMD ["npm", "start"]

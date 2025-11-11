@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: expense-frontend
+  namespace: expense-ai
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: expense-frontend
+  template:
+    metadata:
+      labels:
+        app: expense-frontend
+    spec:
+      initContainers:
+        - name: migrate
+          image: ghcr.io/YOUR_GITHUB_USERNAME/expense-ai:latest
+          envFrom:
+            - secretRef:
+                name: app-secrets
+          command: ["sh", "-c", "npx prisma migrate deploy"]
+      containers:
+        - name: web
+          image: ghcr.io/YOUR_GITHUB_USERNAME/expense-ai:latest
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: app-secrets
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
