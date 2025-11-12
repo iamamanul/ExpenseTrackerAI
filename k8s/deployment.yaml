@@ -13,16 +13,18 @@ spec:
       labels:
         app: expense-frontend
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       initContainers:
         - name: migrate
-          image: ghcr.io/YOUR_GITHUB_USERNAME/expense-ai:latest
+          image: ghcr.io/iamamanul/expense-ai:latest
           envFrom:
             - secretRef:
                 name: app-secrets
           command: ["sh", "-c", "npx prisma migrate deploy"]
       containers:
         - name: web
-          image: ghcr.io/YOUR_GITHUB_USERNAME/expense-ai:latest
+          image: ghcr.io/iamamanul/expense-ai:latest
           ports:
             - containerPort: 3000
           envFrom:
