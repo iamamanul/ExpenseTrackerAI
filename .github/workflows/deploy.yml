@@ -35,22 +35,31 @@ jobs:
         run: docker push $IMAGE_NAME:latest
 
   deploy:
-    name: Deploy to EC2 (Kubernetes)
-    runs-on: ubuntu-latest
-    needs: build
+       name: Deploy to EC2 (Kubernetes)
+       runs-on: ubuntu-latest
+       needs: build
 
-    steps:
-      - name: SSH into EC2 and redeploy
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd ~/app
-            kubectl -n expense-ai rollout restart deployment expense-frontend
-            sleep 20
-            kubectl -n expense-ai get pods
-            curl -I http://localhost || true
-            echo "✅ Redeploy complete"
+       steps:
+         - name: SSH into EC2 and update GHCR secret + redeploy
+           uses: appleboy/ssh-action@v1.0.0
+           with:
+             host: ${{ secrets.EC2_HOST }}
+             username: ubuntu
+             key: ${{ secrets.EC2_SSH_KEY }}
+             script: |
+               echo "🔐 Updating GHCR pull secret in Kubernetes"
 
+               kubectl -n expense-ai delete secret ghcr-pull-secret --ignore-not-found
+
+               kubectl -n expense-ai create secret docker-registry ghcr-pull-secret \
+                 --docker-server=ghcr.io \
+                 --docker-username=iamamanul \
+                 --docker-password=${{ secrets.GHCR_TOKEN }} \
+                 --docker-email=dummy@example.com
+
+               echo "♻ Restarting deployment"
+               kubectl -n expense-ai rollout restart deployment expense-frontend
+
+               sleep 20
+               kubectl -n expense-ai get pods
+               echo "✅ Redeploy complete"
