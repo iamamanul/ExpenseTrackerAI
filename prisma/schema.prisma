@@ -14,14 +14,15 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  clerkUserId String   @unique
-  email     String   @unique
-  name      String?
-  imageUrl String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  Records  Record[]
+  id            String   @id @default(uuid())
+  clerkUserId   String   @unique
+  email         String   @unique
+  name          String?
+  imageUrl      String?
+  monthlyBudget Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  Records       Record[]
 }
 
 model Record {
