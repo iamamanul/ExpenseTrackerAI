@@ -1,28 +1,39 @@
 'use server';
 
 import { checkUser } from '@/lib/checkUser';
-// We import the function from lib/ai and give it a new name 'generateAnswerFromAI' to avoid confusion
+import { db } from '@/lib/db';
 import { generateInsightAnswer as generateAnswerFromAI } from '@/lib/ai';
 
-// This is the server action that your component calls
 export async function generateInsightAnswer(question: string): Promise<string> {
   try {
-    // First, check if the user is logged in
     const user = await checkUser();
     if (!user) {
-      throw new Error('User not authenticated');
+      return 'Please sign in to ask questions about your expenses.';
     }
 
-    // Now, call the actual AI function from lib/ai.ts with the question
-    // The logic for fetching expenses was removed because the new AI function in lib/ai.ts handles everything and doesn't need the expense data passed to it this way.
-    const answer = await generateAnswerFromAI(question);
-    return answer;
+    // Fetch user's recent records for context
+    const expenses = await db.record.findMany({
+      where: {
+        userId: user.clerkUserId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 40,
+    });
 
+    const expenseRecords = expenses.map((e: { text: string; amount: number; category: string; date?: Date; createdAt: Date }) => ({
+      description: e.text,
+      amount: e.amount,
+      category: e.category,
+      date: (e.date || e.createdAt).toISOString(),
+    }));
+
+    const answer = await generateAnswerFromAI(question, expenseRecords);
+    return answer;
   } catch (error) {
-    // Handle any errors that occur
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
     console.error('Error generating insight answer:', error);
-    // Return a user-friendly error message
-    return `I'm unable to provide a detailed answer at the moment. The AI service reported: ${errorMessage}`;
+    return `I'm unable to process your request right now. (${errorMessage})`;
   }
 }

@@ -3,6 +3,7 @@ import AIInsights from '@/components/AIInsights';
 import Guest from '@/components/Guest';
 import RecordChart from '@/components/RecordChart';
 import { currentUser } from '@clerk/nextjs/server';
+import { checkUser } from '@/lib/checkUser';
 import RecordHistoryWrapper from '@/components/RecordHistoryWrapper';
 import Image from 'next/image';
 
@@ -11,6 +12,12 @@ export default async function HomePage() {
   if (!user) {
     return <Guest />;
   }
+
+  // Ensure user is synced to DB for records and AI insights
+  await checkUser();
+
+  const displayName = user.firstName || user.username || user.emailAddresses?.[0]?.emailAddress?.split('@')[0] || 'Friend';
+
   return (
     <main className='bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 font-sans min-h-screen transition-colors duration-300'>
       {/* Main container */}
@@ -28,9 +35,9 @@ export default async function HomePage() {
               <div className='flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6'>
                 <div className='relative flex-shrink-0'>
                   <Image
-                    src={user.imageUrl}
-                    alt={`${user.firstName}'s profile`}
-                    className='w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-white dark:border-gray-600 shadow-lg'
+                    src={user.imageUrl || '/favicon.ico'}
+                    alt={`${displayName}'s profile`}
+                    className='w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-white dark:border-gray-600 shadow-lg object-cover'
                     width={80}
                     height={80}
                     priority
@@ -46,7 +53,7 @@ export default async function HomePage() {
                       <span className='text-white text-sm sm:text-lg'>👋</span>
                     </div>
                     <h2 className='text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100'>
-                      Welcome Back, {user.firstName}!
+                      Welcome Back, {displayName}!
                     </h2>
                   </div>
                   <p className='text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-4 sm:mb-6 max-w-md mx-auto sm:mx-0'>

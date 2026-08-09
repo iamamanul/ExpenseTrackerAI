@@ -1,6 +1,6 @@
 'use server';
-import { auth } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
+import { checkUser } from '@/lib/checkUser';
 import { revalidatePath } from 'next/cache';
 
 interface RecordData {
@@ -53,12 +53,14 @@ async function addExpenseRecord(formData: FormData): Promise<RecordResult> {
   }
 
   // Get logged in user
-  const { userId } = await auth();
+  const user = await checkUser();
 
   // Check for user
-  if (!userId) {
-    return { error: 'User not found' };
+  if (!user) {
+    return { error: 'User not found or unauthenticated' };
   }
+
+  const userId = user.clerkUserId;
 
   try {
     // Create a new record (allow multiple expenses per day)
